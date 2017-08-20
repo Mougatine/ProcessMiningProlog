@@ -21,6 +21,10 @@ append_list([X|L1], L2, L) :-
   append_list(L1, L2, R),
   unique_add(X, R, L).
 
+%=============================================================================
+% Alpha algorithm
+%==
+
 %-----------------------------------------------------------------------------
 % Create the list of all the transition Tl.
 %--
@@ -59,4 +63,88 @@ create_To([L|R], To) :-
   create_To_sub(L, O),
   create_To(R, Ret_R),
   unique_add(O, Ret_R, To).
+
+%-----------------------------------------------------------------------------
+% Check if a direct succession exist (equiv to transition).
+%--
+
+% Direct succession: A>B
+% iff theta=t1 ... tn, it exist ti=A et ti+1=B
+
+% does A>B ?
+direct_succession(A, B, Tl) :-
+  member([A,B], Tl).
+
+%-----------------------------------------------------------------------------
+% Check if there is a causality of A to B.
+%--
+
+% Causality: A->B
+% A->B iff A>B and not B>A.
+
+% Does A->B ?
+causality(A, B, Tl) :-
+  direct_succession(A, B, Tl),
+  not(direct_succession(B, A, Tl)).
+
+%-----------------------------------------------------------------------------
+% Check if A and B are concurent.
+%--
+
+% Parallel: A||B
+% A||B iff A>B and B>A
+
+% Does A||B ?
+parallel(A, B, Tl) :-
+  direct_succession(A, B, Tl),
+  direct_succession(B, A, Tl).
+
+%-----------------------------------------------------------------------------
+% Check if there is a choice between A and B.
+%--
+
+% Choice: A#B
+% A#B iff not A>B and not B>A.
+
+% Does A#B ?
+choice(A, B, Tl) :-
+  not(direct_succession(A, B, Tl)),
+  not(direct_succession(B, A, Tl)).
+
+%-----------------------------------------------------------------------------
+% Check if there is a loop of size 2 with A and B.
+%
+% WARNING: This came from the extended algorithm
+%--
+
+% short loop: A@B
+% A@B iff A^B and B^A
+% with
+% A^B iff theta=t1 ... tn, it exist ti=ti+2=A et ti+1=B
+
+% Does A^B in that list ?
+half_loop_sub(_, _, [_,_]).
+half_loop_sub(A, B, [A, B, A | _]).
+half_loop_sub(A, B, [_|L]) :-
+  half_loop_sub(A, B, L).
+
+% Does A^B in that list of list ?
+half_loop(A, B, [L|_]) :-
+  half_loop_sub(A, B, L).
+half_loop(A, B, [_|R]) :-
+  half_loop(A, B, R).
+
+% Does A@B in the logs ?
+loop_of_2(A, B, EventLog) :-
+  half_loop(A, B, EventLog),
+  half_loop(B, A, EventLog).
+
+%-----------------------------------------------------------------------------
+% Check if there is a loop of size 1 with A.
+%
+% HARD WARNING: This came from myself.
+%--
+
+loop_of_1(A, Tl) :-
+  direct_succession(A, A, Tl).
 
