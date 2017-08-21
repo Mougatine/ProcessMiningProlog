@@ -21,6 +21,20 @@ append_list([X|L1], L2, L) :-
   append_list(L1, L2, R),
   unique_add(X, R, L).
 
+get_log1(L) :-
+  L=[[a,b,c,d],[a,c,b,d],[a,e,d]].
+
+% Create alphabet
+create_alphabet_sub([], []).
+create_alphabet_sub([X|L], [X|A]) :-
+  create_alphabet_sub(L, A).
+create_alphabet([], []).
+create_alphabet([L|R], A) :-
+  create_alphabet_sub(L, Ret_L),
+  create_alphabet(R, Ret_R),
+  append_list(Ret_L, Ret_R, A).
+
+
 %=============================================================================
 % Alpha algorithm
 %==
