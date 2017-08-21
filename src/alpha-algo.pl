@@ -1,3 +1,4 @@
+:- dynamic (has_parallel/2, has_choice/2, has_causality/2, has_reverse_causality/2).
 %-----------------------------------------------------------------------------
 % Misc functions.
 %--
@@ -101,6 +102,10 @@ causality(A, B, Tl) :-
   direct_succession(A, B, Tl),
   not(direct_succession(B, A, Tl)).
 
+reverse_causality(A, B, Tl) :-
+  direct_succession(B, A, Tl),
+  not(direct_succession(A, B, Tl)).
+
 %-----------------------------------------------------------------------------
 % Check if A and B are concurent.
 %--
@@ -161,4 +166,32 @@ loop_of_2(A, B, EventLog) :-
 
 loop_of_1(A, Tl) :-
   direct_succession(A, A, Tl).
+
+%-----------------------------------------------------------------------------
+% Create database (array of relation)
+%
+% Add needed relation into the dynamic database of prolog.
+%--
+
+add_relation(A, B, Tl) :-
+  parallel(A, B, Tl),
+  assert(has_parallel(A, B)).
+add_relation(A, B, Tl) :-
+  choice(A, B, Tl),
+  assert(has_choice(A, B)).
+add_relation(A, B, Tl) :-
+  causality(A, B, Tl),
+  assert(has_causality(A, B)).
+add_relation(A, B, Tl) :-
+  reverse_causality(A, B, Tl),
+  assert(has_reverse_causality(A, B)).
+
+create_database_rec([], _, _).
+create_database_rec(_, [], _).
+create_database_rec([X1|L1], [X2|L2], Tl) :-
+  add_relation(X1, X2, Tl),
+  create_database_rec([X1|L1], L2, Tl),
+  create_database_rec(L1, [X2|L2], Tl).
+create_database(Alphabet, Tl) :-
+  create_database_rec(Alphabet, Alphabet, Tl).
 
