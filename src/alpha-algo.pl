@@ -1,4 +1,15 @@
-:- dynamic (has_parallel/2, has_choice/2, has_causality/2, has_reverse_causality/2).
+clearall :-
+  retractall(has_parallel(_,_)),
+  retractall(has_choice(_,_)),
+  retractall(has_causality(_,_)),
+  retractall(has_reverse_causality(_,_)).
+
+:- dynamic (has_parallel/2,
+            has_choice/2,
+            has_causality/2,
+            has_reverse_causality/2),
+   clearall.
+
 %-----------------------------------------------------------------------------
 % Misc functions.
 %--
@@ -21,9 +32,6 @@ append_list([], [X|L2], L) :-
 append_list([X|L1], L2, L) :-
   append_list(L1, L2, R),
   unique_add(X, R, L).
-
-get_log1(L) :-
-  L=[[a,b,c,d],[a,c,b,d],[a,e,d]].
 
 % Create alphabet
 create_alphabet_sub([], []).
@@ -269,10 +277,8 @@ create_pair(E, [C|R], [ [[E],[C]] | L ]) :-
 % for all element of the sets S->C and C#E is true.
 extend_end_sub(_, [], []).
 extend_end_sub(C, [[S,E] | R], [[S,E] | Ret]) :-
-  not(has_only_choice_in(C, E)),
-  extend_end_sub(C, R, Ret).
-extend_end_sub(C, [[S,E] | R], [[S,E] | Ret]) :-
-  not(has_only_reverse_causality_in(C, S)),
+  (not(has_only_choice_in(C, E));
+   not(has_only_reverse_causality_in(C, S))),
   extend_end_sub(C, R, Ret).
 extend_end_sub(C, [[S,E] | R], [[S,E],[S,[C|E]] | Ret]) :-
   extend_end_sub(C, R, Ret).
@@ -289,10 +295,8 @@ extend_end([C|L], G, Ret) :-
 % for all element of the sets C#S and S->E is true.
 extend_start_sub(_, [], []).
 extend_start_sub(C, [[S,E] | R], [[S,E] | Ret]) :-
-  not(has_only_choice_in(C, S)),
-  extend_start_sub(C, R, Ret).
-extend_start_sub(C, [[S,E] | R], [[S,E] | Ret]) :-
-  not(has_only_causality_in(C, E)),
+  (not(has_only_choice_in(C, S));
+   not(has_only_causality_in(C, E))),
   extend_start_sub(C, R, Ret).
 extend_start_sub(C, [[S,E] | R], [[S,E],[[C|S],E] | Ret]) :-
   extend_start_sub(C, R, Ret).
@@ -363,3 +367,30 @@ create_Yl_sub([A|L], Alphabet, Yl) :-
 % Create_Yl(the alphabet, Yl).
 create_Yl(Alphabet, Yl) :-
   create_Yl_sub(Alphabet, Alphabet, Yl).
+
+%-----------------------------------------------------------------------------
+% TEST
+%--
+
+% Yl should contains [[[a],[b,e]], [[a],[c,e]], [[b,c],[d]], [[c,e],[d]]]
+test1 :-
+  clearall,
+  Logs=[[a,b,c,d],[a,c,b,d],[a,e,d]],
+  create_alphabet(Logs, Alphabet),
+  create_Tl(Logs, Tl),
+  create_database(Alphabet, Tl),
+  create_Yl(Alphabet, Yl),
+  write(Yl).
+
+% Yl should contains [[[b],[c], [[b],[d]], [[c],[e]], [[d],[e]], [[e],[f,g]],
+% [[a,f],[b]]
+test2 :-
+  clearall,
+  Logs=[[a,b,c,d,e,g], [a,b,d,c,e,f,b,c,d,e,g],
+       [a,b,c,d,e,f,b,c,d,e,f,b,d,c,e,g]],
+  create_alphabet(Logs, Alphabet),
+  create_Tl(Logs, Tl),
+  create_database(Alphabet, Tl),
+  create_Yl(Alphabet, Yl),
+  write(Yl).
+
