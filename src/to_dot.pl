@@ -23,7 +23,9 @@ write_states_sub(File, [X|L]) :-
 write_states(File, Yl) :-
   write(File, '  subgraph state {\n'),
   write(File, '    node [shape=circle,fixedsize=true,width=0.5,label=""];\n'),
+  write(File, '    "initial_state";\n'),
   write_states_sub(File, Yl),
+  write(File, '    "final_state";\n'),
   write(File, '  }\n').
 
 %-----------------------------------------------------------------------------
@@ -92,6 +94,27 @@ write_transitions(File, [[S,E] | L]) :-
   write_transitions_out(File, [S,E], E),
   write_transitions(File, L).
 
+% Write all transition from initial state to activities in Ti (initial
+% activities).
+%
+% write_initial_transitions(File, Ti).
+write_initial_transitions(_, []).
+write_initial_transitions(File, [X|L]) :-
+  write(File, '  "initial_state" -> "'),
+  write(File, X),
+  write(File, '";\n'),
+  write_initial_transitions(File, L).
+
+% Write all transition from activities in To (final activities) to final state.
+%
+% write_final_transitions(File, To).
+write_final_transitions(_, []).
+write_final_transitions(File, [X|L]) :-
+  write(File, '  "'),
+  write(File, X),
+  write(File, '" -> "final_state";\n'),
+  write_final_transitions(File, L).
+
 %-----------------------------------------------------------------------------
 % Create a petri's net from logs and write into a file.
 %--
@@ -100,13 +123,17 @@ write_transitions(File, [[S,E] | L]) :-
 write_graph(File, Logs) :-
   clearall,
   create_alphabet(Logs, Alphabet),
+  create_Ti(Logs, Ti),
   create_Tl(Logs, Tl),
+  create_To(Logs, To),
   create_database(Alphabet, Tl),
   create_Yl(Alphabet, Yl),
   write(File, "Digraph G {\n"),
   write_states(File, Yl),
   write_activities(File, Alphabet),
+  write_initial_transitions(File, Ti),
   write_transitions(File, Yl),
+  write_final_transitions(File, To),
   write(File, "}\n").
 
 % Open the File at path FileName, create and write petri's net into, then close
