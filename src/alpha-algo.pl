@@ -369,28 +369,45 @@ create_Yl(Alphabet, Yl) :-
   create_Yl_sub(Alphabet, Alphabet, Yl).
 
 %-----------------------------------------------------------------------------
-% TEST
+% Alpha algorithm.
+%
+% Take logs as input and return Ti (the set of initial activities), Yl (a list
+% of pairs of set, representing states of the petri's net) and To (the set of
+% final activities).
 %--
 
-% Yl should contains [[[a],[b,e]], [[a],[c,e]], [[b,c],[d]], [[c,e],[d]]]
-test1 :-
+alpha_algo(Logs, Ti, Yl, To) :-
   clearall,
-  Logs=[[a,b,c,d],[a,c,b,d],[a,e,d]],
   create_alphabet(Logs, Alphabet),
+  create_Ti(Logs, Ti),
+  create_To(Logs, To),
   create_Tl(Logs, Tl),
   create_database(Alphabet, Tl),
-  create_Yl(Alphabet, Yl),
-  write(Yl).
+  create_Yl(Alphabet, Yl).
 
+%-----------------------------------------------------------------------------
+% TESTS
+%--
+
+run_test(Logs) :-
+  alpha_algo(Logs, Ti, Yl, To),
+  write('Ti= '), write(Ti), nl,
+  write('Yl= '), write(Yl), nl,
+  write('To= '), write(To), nl.
+
+% Ti should contains [a]
+% Yl should contains [[[a],[b,e]], [[a],[c,e]], [[b,c],[d]], [[c,e],[d]]]
+% To should contains [d]
+alpha_test1 :-
+  Logs=[[a,b,c,d],[a,c,b,d],[a,e,d]],
+  run_test(Logs).
+
+% Ti should contains [a]
 % Yl should contains [[[b],[c], [[b],[d]], [[c],[e]], [[d],[e]], [[e],[f,g]],
-% [[a,f],[b]]
-test2 :-
-  clearall,
+%                     [[a,f],[b]]
+% To should contains [g]
+alpha_test2 :-
   Logs=[[a,b,c,d,e,g], [a,b,d,c,e,f,b,c,d,e,g],
        [a,b,c,d,e,f,b,c,d,e,f,b,d,c,e,g]],
-  create_alphabet(Logs, Alphabet),
-  create_Tl(Logs, Tl),
-  create_database(Alphabet, Tl),
-  create_Yl(Alphabet, Yl),
-  write(Yl).
+  run_test(Logs).
 
