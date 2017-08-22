@@ -17,13 +17,18 @@
 % operators := operator
 %           | operator ',' operators
 %
-% exp := args
-%     | operators
+% array_exp := exps
+%           | exps ',' array_exp
 %
-% elt := [value]
+% exps := args
+%      | operators
 %
 % args := elt
 %      | elt ',' args
+%
+% elt := [value]
+%
+% operator := [operator] '(' array_exp ')'
 
 
 lines([]) --> call(eos), !.
@@ -37,34 +42,27 @@ line([Log|Ls]) --> operators(Log), line(Ls).
 operators(Op) --> operator(Op).
 operators([Op, Ops]) --> operator(Op), ", ", operators(Ops).
 
-exp(Terms) --> args(Terms).
-exp(Terms) --> operators(Terms).
+array_exp(Args) --> exps(Args).
+array_exp([X|Args]) --> exps(X), ", ", array_exp(Args).
 
-elt(Arg) --> [Arg].
+exps(Terms) --> args(Terms).
+exps(Terms) --> operators(Terms).
+
 args([Arg]) --> elt(Arg).
 args([X|Args]) --> elt(X), ", " , args(Args).
 
-operator(Term) --> "seq", "(", exp(Op), ")", { build_term(seq, Op, Term) }.
-operator(Term) --> "alt", "(", exp(Op), ")", { build_term(alt, Op, Term) }.
-operator(Term) --> "par", "(", exp(Op), ")", { build_term(par, Op, Term) }.
-operator(Term) --> "loop", "(", exp(Op), ")", { build_term(loop, Op, Term) }.
+elt(Arg) --> [X], { atom_codes(Arg, [X]) }.
 
-% build_args convert a list of chars represented by their ascii value
-% to a list of intergers
-build_args([], []).
-build_args([H|Args], [Num|Res]) :-
-    atom_codes(Num, [H]),
-    build_args(Args, Res).
+operator(Term) --> "seq", "(", array_exp(Op), ")", { build_term(seq, Op, Term) }.
+operator(Term) --> "alt", "(", array_exp(Op), ")", { build_term(alt, Op, Term) }.
+operator(Term) --> "par", "(", array_exp(Op), ")", { build_term(par, Op, Term) }.
+operator(Term) --> "loop", "(", array_exp(Op), ")", { build_term(loop, Op, Term) }.
 
 % build_term creates a term from a functor
 % and a list of arguments, or from a composition of functors
 build_term(Operation, Args, Term) :-
-    build_args(Args, NumArgs),
-    append([Operation], NumArgs, Res),
-    Term =.. Res.
-
-build_term(Operation, Args, Term) :-
-    append([Operation], [Args], Res),
+    flatten(Args, FlatArgs),
+    append([Operation], FlatArgs, Res),
     Term =.. Res.
 
 % read_file reads a file content until EOF, and then closes it
