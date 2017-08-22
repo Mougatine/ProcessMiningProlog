@@ -27,7 +27,7 @@
 
 
 lines([]) --> call(eos), !.
-lines([Line|Lines]) --> line(Line), lines(Lines).
+lines([Line|Lines]) --> line(X), { flatten(X, Line) }, lines(Lines).
 
 eos([], []).
 
@@ -69,5 +69,4 @@ build_term(Operation, Args, Term) :-
 
 % read_file reads a file content until EOF, and then closes it
 read_file(Path, Logs) :-
-    phrase_from_file(lines(Ls), Path),
-    write(Ls), nl.
+    phrase_from_file(lines(Logs), Path).

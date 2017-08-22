@@ -1,1 +1,2 @@
-loop(seq(a, b))
+seq(a, b, c), loop(seq(a, b))
+par(a, b)
