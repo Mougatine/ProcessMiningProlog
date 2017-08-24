@@ -1,2 +1,0 @@
-seq(a, b), loop(c, seq(d, e))
-par(a, b), alt(c, d)
