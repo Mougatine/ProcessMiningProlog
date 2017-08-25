@@ -62,20 +62,35 @@ smooth([X|L], [X|R]) :-
 %--
 
 find_ALT([], [], []).
+find_ALT([[S,E] | L], [[F,E] | R_or], R_Yl) :-
+  size_of(E, Len_e),
+  Len_e > 1,
+  size_of(S, Len_s),
+  Len_s == 1,
+  flatten(S, F),
+  find_ALT(L, R_or, R_Yl).
 find_ALT([[S,E] | L], [[S,E] | R_or], R_Yl) :-
-  size_of(E, Len),
-  Len > 1,
+  size_of(E, Len_e),
+  Len_e > 1,
   find_ALT(L, R_or, R_Yl).
 find_ALT([X|L], R_or, [X|R_Yl]) :-
   find_ALT(L, R_or, R_Yl).
 
 get_ALT(Yl, Ret, R_Yl) :-
-  find_ALT(Yl, R_alt, R_Yl),
-  smooth(R_alt, Ret).
+  find_ALT(Yl, Ret, R_Yl).
 
 %--
 
+find_PAR_sub([_,E], [], [F], []) :-
+  size_of(E, 1),
+  flatten(E, F).
 find_PAR_sub([_,E], [], [E], []).
+find_PAR_sub([S1,E1], [[S2,E2] | R], [F | R_sub], R_Yl) :-
+  S1 == S2,
+  E1 \== E2,
+  size_of(E2, 1),
+  flatten(E2, F),
+  find_PAR_sub([S1,E1], R, R_sub, R_Yl).
 find_PAR_sub([S1,E1], [[S2,E2] | R], [E2 | R_sub], R_Yl) :-
   S1 == S2,
   E1 \== E2,
@@ -84,6 +99,13 @@ find_PAR_sub([S1,E1], [X|R], R_sub, [X|R_Yl]) :-
   find_PAR_sub([S1,E1], R, R_sub, R_Yl).
 
 find_PAR([], [], []).
+find_PAR([[S,E] | L], [[F,R_sub] | R_and], R_Yl) :-
+  find_PAR_sub([S,E], L, R_sub, R_L),
+  size_of(R_sub, Len),
+  Len > 1,
+  size_of(S, 1),
+  flatten(S, F),
+  find_PAR(R_L, R_and, R_Yl).
 find_PAR([[S,E] | L], [[S,R_sub] | R_and], R_Yl) :-
   find_PAR_sub([S,E], L, R_sub, R_L),
   size_of(R_sub, Len),
@@ -94,8 +116,7 @@ find_PAR([X|L], R_and, [X|R_Yl]) :-
 
 get_PAR(Yl, Ret,  R_Yl) :-
   find_PAR(Yl, R_par, R_Yl),
-  fuse(R_par, Ret_f),
-  smooth(Ret_f, Ret).
+  fuse(R_par, Ret).
 
 %--
 
@@ -110,9 +131,9 @@ find_SEQ([[S,E] | L], R_seq, [[S,E] | R_Yl]) :-
   find_SEQ(L, R_seq, R_Yl).
 
 get_SEQ(Yl, Ret, R_Yl) :-
-  find_SEQ(Yl, R_seq, R_Yl),
-  smooth(R_seq, Ret).
+  find_SEQ(Yl, Ret, R_Yl).
 
+/*
 %-----------------------------------------------------------------------------
 % Find join of operator.
 %--
@@ -143,7 +164,7 @@ find_join_PAR([[S,E] | L], [[E,R_sub] | R_and], R_Yl) :-
   find_join_PAR(R_L, R_and, R_Yl).
 find_join_PAR([X|L], R_and, [X|R_Yl]) :-
   find_join_PAR(L, R_and, R_Yl).
-
+*/
 %-----------------------------------------------------------------------------
 % Translate to Seq, Par, Alt.
 %--
@@ -177,7 +198,7 @@ has_starting_with(E, Par, Alt, Seq, A1, B1, C1) :-
 
 % case END
 follow_alt_sub([], Par, Alt, Seq, Visited) :-
-  write(')'),
+  write('\b)'),
   % Reverse ? Or write a spec equal ?
   reverse(Visited, Rev),
   new_block(Rev, Par, Alt, Seq).
@@ -217,7 +238,7 @@ follow_alt(L, Par, Alt, Seq) :-
 
 % case END
 follow_par_sub([], Par, Alt, Seq, Visited) :-
-  write(')'),
+  write('\b)'),
   % Reverse ? Or write a spec equal ?
   reverse(Visited, Rev),
   new_block(Rev, Par, Alt, Seq).
@@ -258,7 +279,7 @@ follow_par(L_par, Par, Alt, Seq) :-
 % Case END
 follow_seq(X, Par, Alt, Seq) :-
   has_starting_with(X, Par, Alt, Seq, [], [], []),
-  write(X), write(')').
+  write(X), write('\b)').
 % Case simple X
 follow_seq(X, Par, Alt, Seq) :-
   has_starting_with(X, Par, Alt, Seq, [], [], [E]),
@@ -268,9 +289,9 @@ follow_seq(X, Par, Alt, Seq) :-
 % Case X start a PAR or Alt
 follow_seq(X, Par, Alt, Seq) :-
   has_starting_with(X, Par, Alt, Seq, _, _, _),
-  write(X),
+  write(X), write(','),
   new_block(X, Par, Alt, Seq),
-  write(')').
+  write('\b)').
 
 %--
 
@@ -298,7 +319,8 @@ new_block(I, Par, Alt, Seq) :-
 
 to_model_sub([X], Par, Alt, Seq) :-
   write('Seq('),
-  follow_seq([X], Par, Alt, Seq).
+  follow_seq(X, Par, Alt, Seq),
+  write(')').
 % Make to model for Alt and Par.
 
 to_model(Logs) :-
@@ -308,6 +330,7 @@ to_model(Logs) :-
   get_SEQ(Yl, Seq, _),
   to_model_sub(Ti, Par, Alt, Seq).
 
+/*
 %-----------------------------------------------------------------------------
 % What is this ?
 %--
@@ -344,3 +367,4 @@ create_cut(I, [X|L], [X | Ret]) :-
   create_cut(I, L, Ret).
 create_cut(I, [_|L], Ret) :-
   create_cut(I, L, Ret).
+*/
