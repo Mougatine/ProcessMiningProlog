@@ -158,3 +158,19 @@ dot_test2 :-
        [a,b,c,d,e,f,b,c,d,e,f,b,d,c,e,g]],
   FileName='test2.dot',
   write_dot(Logs, FileName).
+
+dot_test3 :-
+  Logs=[[a,b,g,e,d,f],[a,g,b,e,d,f],[a,b,g,d,e,f],[a,g,b,d,e,f],
+        [a,c,g,e,d,f],[a,g,c,e,d,f],[a,c,g,d,e,f],[a,g,c,d,e,f]],
+  FileName='test3.dot',
+  write_dot(Logs, FileName).
+
+dot_test4 :-
+  Logs=[[a,b,d,z],[a,d,b,z],[a,e,f,z],[a,f,e,z]],
+  FileName='test4.dot',
+  write_dot(Logs, FileName).
+
+dot_test5 :-
+  Logs[[a,b,e,d,f],[a,b,d,e,f],[a,d,b,e,f],[a,c,e,d,f],[a,c,d,e,f],[a,d,c,e,f]]
+  FileName='test5.dot',
+  write_dot(Logs, FileName).
