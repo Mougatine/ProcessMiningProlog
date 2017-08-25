@@ -1,6 +1,8 @@
 :- consult('src/alpha-algo.pl').
 
-:- dynamic(block/2).
+%-----------------------------------------------------------------------------
+% Misc
+%--
 
 size_of([_], 1).
 size_of([_|L], R+1) :-
@@ -133,38 +135,6 @@ find_SEQ([[S,E] | L], R_seq, [[S,E] | R_Yl]) :-
 get_SEQ(Yl, Ret, R_Yl) :-
   find_SEQ(Yl, Ret, R_Yl).
 
-/*
-%-----------------------------------------------------------------------------
-% Find join of operator.
-%--
-
-find_join_ALT([], [], []).
-find_join_ALT([[S,E] | L], [[S,E] | R_alt], R_Yl) :-
-  size_of(S, Len),
-  Len > 1,
-  find_join_ALT(L, R_alt, R_Yl).
-find_join_ALT([X|L], R_alt, [X|R_Yl]) :-
-  find_join_ALT(L, R_alt, R_Yl).
-
-%--
-
-find_join_PAR_sub([S,_], [], [S], []).
-find_join_PAR_sub([S1,E1], [[S2,E2] | R], [S2 | R_sub], R_Yl) :-
-  S1 \== S2,
-  E1 == E2,
-  find_join_PAR_sub([S1,E1], R, R_sub, R_Yl).
-find_join_PAR_sub([S1,E1], [X|R], R_sub, [X|R_Yl]) :-
-  find_join_PAR_sub([S1,E1], R, R_sub, R_Yl).
-
-find_join_PAR([], [], []).
-find_join_PAR([[S,E] | L], [[E,R_sub] | R_and], R_Yl) :-
-  find_join_PAR_sub([S,E], L, R_sub, R_L),
-  size_of(R_sub, Len),
-  Len > 1,
-  find_join_PAR(R_L, R_and, R_Yl).
-find_join_PAR([X|L], R_and, [X|R_Yl]) :-
-  find_join_PAR(L, R_and, R_Yl).
-*/
 %-----------------------------------------------------------------------------
 % Translate to Seq, Par, Alt.
 %--
@@ -329,42 +299,3 @@ to_model(Logs) :-
   get_ALT(Yl, Alt, _),
   get_SEQ(Yl, Seq, _),
   to_model_sub(Ti, Par, Alt, Seq).
-
-/*
-%-----------------------------------------------------------------------------
-% What is this ?
-%--
-split_log(_, []).
-split_log(I, [X|L]) :-
-  block(X, P),
-  I == P,
-  II is I + 1,
-  split_log(II, L).
-split_log(I, [X|L]) :-
-  block(X, P),
-  I < P,
-  retract(block(X, P)),
-  asserta(block(X, I)),
-  II is I + 1,
-  split_log(II, L).
-split_log(I, [X|L]) :-
-  block(X, P),
-  I > P,
-  split_log(I, L).
-split_log(I, [X|L]) :-
-  asserta(block(X, I)),
-  II is I + 1,
-  split_log(II, L).
-
-split_logs([]).
-split_logs([X|L]) :-
-  split_log(0, X),
-  split_logs(L).
-
-create_cut(_, [], []).
-create_cut(I, [X|L], [X | Ret]) :-
-  block(X, I),
-  create_cut(I, L, Ret).
-create_cut(I, [_|L], Ret) :-
-  create_cut(I, L, Ret).
-*/
