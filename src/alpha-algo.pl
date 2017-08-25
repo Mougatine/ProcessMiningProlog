@@ -264,7 +264,6 @@ get_causality(X, [A|R], L1, [A|L2]) :-
 get_causality(X, [_|R], L1, L2) :-
   get_causality(X, R, L1, L2).
 
-
 % Create pair with an element E and a list of elements C, return a list of pairs
 % [[E],[C]].
 %
@@ -411,3 +410,17 @@ alpha_test2 :-
        [a,b,c,d,e,f,b,c,d,e,f,b,d,c,e,g]],
   run_test(Logs).
 
+
+alpha_test3 :-
+  Logs=[[a,b,g,e,d,f],[a,g,b,e,d,f],[a,b,g,d,e,f],[a,g,b,d,e,f],
+        [a,c,g,e,d,f],[a,g,c,e,d,f],[a,c,g,d,e,f],[a,g,c,d,e,f]],
+  run_test(Logs).
+
+alpha_test4 :-
+  Logs=[[a,b,d,z],[a,d,b,z],[a,e,f,z],[a,f,e,z]],
+  run_test(Logs).
+
+alpha_test5 :-
+  Logs=[[a,b,e,d,f],[a,b,d,e,f],[a,d,b,e,f],
+        [a,c,e,d,f],[a,c,d,e,f],[a,d,c,e,f]],
+  run_test(Logs).
