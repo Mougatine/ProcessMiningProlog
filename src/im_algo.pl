@@ -48,7 +48,6 @@ create_alphabet([L|R], A) :-
 % and a the input and b, c are the direct children 
 %--
 
-
 state_inputs_sub([], _, []).
 state_inputs_sub([X, State|Log], State, [X|Res]) :-
     state_inputs_sub(Log, State, Res).
@@ -133,12 +132,39 @@ generate_trees([Node|Graph], [Val|Res]) :-
     unpack_node(Node, Val, _, _),
     generate_trees(Graph, Res).
 
+%=============================================================================
+% CUT ALGORITHMS
+%==
+
 %-----------------------------------------------------------------------------
-% Set of functions performing a sequential cut.
+% Set of functions performing a SEQUENTIAL CUT. 
 % First step is to find the connected components.
 % Second step is to merge the unreachable pairwise components.
 %--
 
+% Returns true if A and B are in the same strongly connected component
+ssc(A, B) :-
+    retractall(visited(_)),
+    path(A, B),
+    !,
+    retractall(visited(_)),
+    path(B, A).
+
+% Returns true if A and B are not connected
+not_connected(A, B) :-
+    retractall(visited(_)),
+    \+ path(A, B),
+    retractall(visited(_)),
+    \+ path(B, A).
+
+%---
+% Path looks for a path between two graphs 
+% The graphs are lists which contains one or many nodes 
+% i.e [a, b] and [c, d, e]
+%--
+
+%-- STEP 1
+% Gets the nodes from the graphs
 path_rec(A, [X|_]) :-
     path(A, X).
 path_rec(A, [_|T]) :-
@@ -148,11 +174,14 @@ path_rec([Nd|_], Target) :-
 path_rec([_|Clique], Target) :-
     path_rec(Clique, Target).
 
+% Calls path on the node's children
 path_sub(_, Target, [O|_]) :-
     path([O], Target).
 path_sub(A, Target, [_|Out]) :-
     path_sub(A, Target, Out).
 
+% Visits a node and marks it.
+% Then calls path_sub on its children
 path(A, A).
 path([Nd|Clique], Target) :-
     path_rec([Nd|Clique], Target).
@@ -166,32 +195,96 @@ path(A, Target) :-
     node(A, _, Out),
     path_sub(A, Target, Out).
 
+% Returns the strongly connected component
+% containing the node A
 connected_components(C, [], C).
 connected_components(A, [B|Graph], Clique) :-
-    path(A, B),
-    path(B, A),
+    ssc(A, B),
     append(A, B, C),
-    retractall(visited(_)),
     connected_components(C, Graph, Clique).
 connected_components(A, [_|Graph], Clique) :-
     connected_components(A, Graph, Clique).
 
-remove_nodes([], L, L).
-remove_nodes([C|Clique], G1, G2) :-
-    delete(G1, [C], Res),
-    remove_nodes(Clique, Res, G2).
-remove_nodes([_|Clique], G1, G2) :-
+% Removes the nodes merged into a clique
+% from the main graph
+remove_nodes(_, [], []).
+remove_nodes(Clique, [X1|G1], G2) :-
+    intersection(Clique, X1, X2),
+    \+ length(X2, 0),
+    remove_nodes(Clique, G1, G2).
+remove_nodes(Clique, [X|G1], [X|G2]) :-
     remove_nodes(Clique, G1, G2).
 
-cut_graph([], []).
-cut_graph([A|G1], [Clique|Components]) :-
+sequential_cut_sub([], []).
+sequential_cut_sub([A|G1], [Clique|Components]) :-
     connected_components(A, G1, Clique),
     remove_nodes(Clique, G1, G2),
-    retractall(visited(_)),
-    cut_graph(G2, Components).
+    sequential_cut_sub(G2, Components).
+
+%-- STEP 2
+% Merges unreachable pairwise components
+merge_graphs_sub(C, [], C).
+merge_graphs_sub(Tree, [X|Graph], NewTree) :-
+    not_connected(Tree, X),
+    append(Tree, X, TempTree),
+    merge_graphs_sub(TempTree, Graph, NewTree).
+merge_graphs_sub(Tree, [_|Graph], NewTree) :-
+    merge_graphs_sub(Tree, Graph, NewTree).
+
+merge_graphs([], []).
+merge_graphs([T|SubTrees], [G|NewGraphs]) :-
+    merge_graphs_sub(T, SubTrees, G),
+    remove_nodes(G, SubTrees, Res),
+    merge_graphs(Res, NewGraphs).
+
+% Finds the ssc (strongly connected components)
+% then merges the ssc's which are not connected at all
+sequential_cut(Graph, seq, NewGraphs) :-
+    sequential_cut_sub(Graph, SubTrees),
+    merge_graphs(SubTrees, NewGraphs).
+
+%-----------------------------------------------------------------------------
+% Set of functions performing an EXCLUSIVE CUT. 
+% Within a graph of the form [a, b, c, d], finds the sscs so that the result is
+% in the form [[a, b], [c, d]]
+%--
+remove_elt(_, [], []).
+remove_elt(L1, [Elt|L2], Res) :-
+    member(Elt, L1),
+    remove_elt(L1, L2, Res).
+remove_elt(L1, [Elt|L2], [Elt|Res]) :-
+    remove_elt(L1, L2, Res).
+
+divide_node_sub(X, [], [X]).
+divide_node_sub(Elt, [X|L], [X|Res]) :-
+    ssc(Elt, X),
+    divide_node_sub(Elt, L, Res).
+divide_node_sub(Elt, [_|X], Res) :-
+    divide_node_sub(Elt, X, Res).
+
+divide_node([], []).
+divide_node([Elt|L1], NewGraph) :-
+    divide_node_sub(Elt, L1, R1),
+    remove_elt(R1, L1, L2)
+    divide_node(L2, R2),
+    append(R1, R2, NewGraph).
+
+exclusive_cut_sub([], []).
+exclusive_cut_sub([G|Graph], [G1|NewGraphs]) :-
+    divide_node(G, G1),
+    exclusive_cut_sub(Graph, NewGraphs).
+
+exclusive_cut(Graph, alt, NewGraphs) :-
+    exclusive_cut_sub(Graph, NewGraphs).
+
+%-----------------------------------------------------------------------------
+% Set of functions performing a BASE CUT. 
+% Within a graph of the form [a, b, c, d], finds the sscs so that the result is
+% in the form [[a, b], [c, d]]
+%--
     
 apply_imd(Graph, NewGraphs) :-
-    cut_graph(Graph, NewGraphs).
+    sequential_cut(Graph, NewGraphs).
 
 
 test1 :-
