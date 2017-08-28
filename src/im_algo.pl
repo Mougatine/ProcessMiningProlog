@@ -1,9 +1,10 @@
 clearall :-
     retractall(has_causality(_, _)),
     retractall(visited(_)),
-    retractall(node(_, _, _)).
+    retractall(node(_, _, _)),
+    retractall(neg_node(_, _, _)).
 
-:- dynamic (has_causality/2, visited/1, node/3), clearall.
+:- dynamic (has_causality/2, visited/1, node/3, neg_node/3), clearall.
 
 %-----------------------------------------------------------------------------
 % Misc functions.
@@ -112,6 +113,13 @@ add_nodes([Node|Graph]) :-
     assert(node(Val, In, Out)),
     add_nodes(Graph).
 
+add_neg_nodes([]).
+add_neg_nodes([Node|Graph]) :-
+    unpack_node(Node, State, In, Out),
+    select(Val, State, []),
+    assert(neg_node(Val, In, Out)),
+    add_neg_nodes(Graph).
+
 %-----------------------------------------------------------------------------
 % Adds the graphs' relations into the database
 %--
@@ -146,17 +154,25 @@ generate_trees([Node|Graph], [Val|Res]) :-
 % Returns true if A and B are in the same strongly connected component
 ssc(A, B) :-
     retractall(visited(_)),
-    path(A, B),
+    path(A, B, node),
     !,
     retractall(visited(_)),
-    path(B, A).
+    path(B, A, node).
 
 % Returns true if A and B are not connected
 not_connected(A, B) :-
     retractall(visited(_)),
-    \+ path(A, B),
+    \+ path(A, B, node),
     retractall(visited(_)),
-    \+ path(B, A).
+    \+ path(B, A, node).
+
+% Returns true if there's at least one connection between A and B
+connected(A, B, Caller) :-
+    retractall(visited(_)),
+    path(A, B, Caller).
+connected(A, B, Caller) :-
+    retractall(visited(_)),
+    path(B, A, Caller).
 
 %---
 % Path looks for a path between two graphs 
@@ -166,35 +182,35 @@ not_connected(A, B) :-
 
 %-- STEP 1
 % Gets the nodes from the graphs
-path_rec(A, [X|_]) :-
-    path(A, X).
-path_rec(A, [_|T]) :-
-    path_rec(A, T).
-path_rec([Nd|_], Target) :-
-    path(Nd, Target).
-path_rec([_|Clique], Target) :-
-    path_rec(Clique, Target).
+path_rec(A, [X|_], Caller) :-
+    path(A, X, Caller).
+path_rec(A, [_|T], Caller) :-
+    path_rec(A, T, Caller).
+path_rec([Nd|_], Target, Caller) :-
+    path(Nd, Target, Caller).
+path_rec([_|Clique], Target, Caller) :-
+    path_rec(Clique, Target, Caller).
 
 % Calls path on the node's children
-path_sub(_, Target, [O|_]) :-
-    path([O], Target).
-path_sub(A, Target, [_|Out]) :-
-    path_sub(A, Target, Out).
+path_sub(_, Target, [O|_], Caller) :-
+    path([O], Target, Caller).
+path_sub(A, Target, [_|Out], Caller) :-
+    path_sub(A, Target, Out, Caller).
 
 % Visits a node and marks it.
 % Then calls path_sub on its children
-path(A, A).
-path([Nd|Clique], Target) :-
-    path_rec([Nd|Clique], Target).
-path(A, [X|Target]) :-
-    path_rec(A, [X|Target]).
-path(A, Target) :-
+path(A, A, _).
+path([Nd|Clique], Target, Caller) :-
+    path_rec([Nd|Clique], Target, Caller).
+path(A, [X|Target], Caller) :-
+    path_rec(A, [X|Target], Caller).
+path(A, Target, Caller) :-
     \+ is_list(A),
     \+ is_list(Target),
     \+ visited(A),
     assert(visited(A)),
-    node(A, _, Out),
-    path_sub(A, Target, Out).
+    call(Caller, A, _, Out),
+    path_sub(A, Target, Out, Caller).
 
 % Returns the strongly connected component
 % containing the node A
@@ -251,14 +267,8 @@ sequential_cut(Graph, seq, NewGraphs) :-
 % in the form [[a, b], [c, d]]
 % Fails if there a no changes (No cuts were found)
 %--
-remove_elt(_, [], []).
-remove_elt(L1, [Elt|L2], Res) :-
-    member(Elt, L1),
-    remove_elt(L1, L2, Res).
-remove_elt(L1, [Elt|L2], [Elt|Res]) :-
-    remove_elt(L1, L2, Res).
 
-divide_node_sub(X, [], [X]).
+divide_node_sub(_, [], []).
 divide_node_sub(Elt, [X|L], [X|Res]) :-
     ssc(Elt, X),
     divide_node_sub(Elt, L, Res).
@@ -266,9 +276,10 @@ divide_node_sub(Elt, [_|X], Res) :-
     divide_node_sub(Elt, X, Res).
 
 divide_node([], []).
-divide_node([Elt|L1], [R1|NewGraph]) :-
-    divide_node_sub(Elt, L1, R1),
-    remove_elt(R1, L1, L2),
+divide_node([Elt|L1], [Res|NewGraph]) :-
+    divide_node_sub(Elt, L1, Tmp),
+    append(Elt, Tmp, Res), % Append Elt to head of list to keep the order
+    subtract(L1, Res, L2),
     divide_node(L2, NewGraph).
 
 exclusive_cut_sub([], []).
@@ -279,6 +290,71 @@ exclusive_cut_sub([G|Graph], NewGraphs) :-
 
 exclusive_cut(Graph, alt, NewGraphs) :-
     exclusive_cut_sub(Graph, NewGraphs),
+    NewGraphs \= Graph.
+
+%-----------------------------------------------------------------------------
+% Set of functions performing a CONCURRENT CUT. 
+% First negates the graph
+% Secondly, computes the concurrent activities by taking the connected components
+% Fails if there a no changes (No cuts were found)
+%--
+
+full_graph_sub([], []).
+full_graph_sub([N|Nodes], [[[N], In, Out]|Res]) :-
+    node(N, In, Out),
+    full_graph_sub(Nodes, Res).
+
+full_graph([], []).
+full_graph([G|Graph], Res) :-
+    full_graph_sub(G, L1),
+    full_graph(Graph, L2),
+    append(L1, L2, Res).
+
+negate_states_sub(In, Out, NewIn, NewOut) :-
+    intersection(In, Out, Intersect),
+    \+ length(Intersect, 0),
+    subtract(In, Intersect, NewIn),
+    subtract(Out, Intersect, NewOut).
+negate_states_sub(In, Out, In, Out).
+
+negate_states([], []).
+negate_states([G|Graph], [[A, NewOut, NewIn]|NegGraph]) :-
+    unpack_node(G, A, In, Out),
+    negate_states_sub(In, Out, NewIn, NewOut),
+    negate_states(Graph, NegGraph).
+
+negate_graph(Graph, NegGraph) :-
+    full_graph(Graph, Full),
+    negate_states(Full, NegGraph),
+    add_neg_nodes(NegGraph).
+
+remove_elt(_, [], []).
+remove_elt(A, [G|Graph], Res) :-
+    unpack_node(G, B, _, _),
+    subset(B, A),
+    remove_elt(A, Graph, Res).
+remove_elt(A, [G|Graph], [G|Res]) :-
+    remove_elt(A, Graph, Res).
+
+parallel_components(C, [], C).
+parallel_components(A, [G|Graph], Res) :-
+    unpack_node(G, B, _, _),
+    connected(A, B, neg_node),
+    append(A, B, C),
+    parallel_components(C, Graph, Res).
+parallel_components(A, [_|Graph], Res) :-
+    parallel_components(A, Graph, Res).
+
+parallel_cut_sub([], []).
+parallel_cut_sub([G|Graph], [C|NewGraphs]) :-
+    unpack_node(G, A, _, _),
+    parallel_components(A, Graph, C),
+    remove_elt(C, Graph, GraphBis),
+    parallel_cut_sub(GraphBis, NewGraphs).
+
+parallel_cut(Graph, par, NewGraphs) :-
+    negate_graph(Graph, NegGraph),
+    parallel_cut_sub(NegGraph, NewGraphs),
     NewGraphs \= Graph.
 
 %-----------------------------------------------------------------------------
@@ -303,6 +379,8 @@ find_cut(Graph, Operator, NewGraphs) :-
     exclusive_cut(Graph, Operator, NewGraphs).
 find_cut(Graph, Operator, NewGraphs) :-
     sequential_cut(Graph, Operator, NewGraphs).
+find_cut(Graph, Operator, NewGraphs) :-
+    parallel_cut(Graph, Operator, NewGraphs).
 
 % Splits transforms sets from the cuts into graphs,
 % i.e  [b, c, d, e] becomes [[b, c, d, e]]
@@ -335,7 +413,7 @@ test1 :-
     imd(Trees, _).
 
 test2 :-
-    Logs=[[a, b, c, d], [a, b, d, c, b]], 
+    Logs=[[a, b, c, d], [a, c, b, d]], 
     create_alphabet(Logs, States),
     generate_graph(Logs, States, Graph),
     create_database(Graph),
