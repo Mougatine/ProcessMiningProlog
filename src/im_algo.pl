@@ -296,9 +296,13 @@ exclusive_cut(Graph, alt, NewGraphs) :-
 % Set of functions performing a CONCURRENT CUT. 
 % First negates the graph
 % Secondly, computes the concurrent activities by taking the connected components
+% The parallel activities are the connected components
 % Fails if there a no changes (No cuts were found)
 %--
 
+% Returns the full graph from the graph passed as parameter
+% i.e for each node, we get the input and output nodes
+% For instance, [a] becomes [[a], [], [b, c]] with b and c the outputs
 full_graph_sub([], []).
 full_graph_sub([N|Nodes], [[[N], In, Out]|Res]) :-
     node(N, In, Out),
@@ -310,6 +314,9 @@ full_graph([G|Graph], Res) :-
     full_graph(Graph, L2),
     append(L1, L2, Res).
 
+% For each node, switches the inputs and the ouputs
+% If the node contains an element x in both the input and ouput sets
+% x is removed from both sets
 negate_states_sub(In, Out, NewIn, NewOut) :-
     intersection(In, Out, Intersect),
     \+ length(Intersect, 0),
@@ -323,11 +330,13 @@ negate_states([G|Graph], [[A, NewOut, NewIn]|NegGraph]) :-
     negate_states_sub(In, Out, NewIn, NewOut),
     negate_states(Graph, NegGraph).
 
+% Computes the negated graph and saves it into the database
 negate_graph(Graph, NegGraph) :-
     full_graph(Graph, Full),
     negate_states(Full, NegGraph),
     add_neg_nodes(NegGraph).
 
+% Removes an element from the full graph
 remove_elt(_, [], []).
 remove_elt(A, [G|Graph], Res) :-
     unpack_node(G, B, _, _),
@@ -336,6 +345,7 @@ remove_elt(A, [G|Graph], Res) :-
 remove_elt(A, [G|Graph], [G|Res]) :-
     remove_elt(A, Graph, Res).
 
+% Computes the parallel sets in the graph
 parallel_components(C, [], C).
 parallel_components(A, [G|Graph], Res) :-
     unpack_node(G, B, _, _),
@@ -352,6 +362,7 @@ parallel_cut_sub([G|Graph], [C|NewGraphs]) :-
     remove_elt(C, Graph, GraphBis),
     parallel_cut_sub(GraphBis, NewGraphs).
 
+% Negates the graph and computes the parallel components
 parallel_cut(Graph, par, NewGraphs) :-
     negate_graph(Graph, NegGraph),
     parallel_cut_sub(NegGraph, NewGraphs),
@@ -367,6 +378,10 @@ base_cut(Graph, Base) :-
     flatten(Graph, Flat),
     length(Flat, 1),
     select(Base, Flat, []).
+
+%-----------------------------------------------------------------------------
+% Set of functions performing a LOOP CUT. 
+%--
 
 %=============================================================================
 % imd is the main_algorithm 
