@@ -1,10 +1,10 @@
 clearall :-
-    retractall(has_causality(_, _)),
     retractall(visited(_)),
     retractall(node(_, _, _)),
-    retractall(neg_node(_, _, _)).
+    retractall(neg_node(_, _, _)),
+    retractall(loop_node(_, _, _)).
 
-:- dynamic (has_causality/2, visited/1, node/3, neg_node/3), clearall.
+:- dynamic (visited/1, node/3, neg_node/3, loop_node/3), clearall.
 
 %-----------------------------------------------------------------------------
 % Misc functions.
@@ -91,34 +91,15 @@ generate_graph(Logs, States, Graph) :-
     generate_graph_sub(Logs, States, Graph).
 
 %-----------------------------------------------------------------------------
-% Adds causality relations into the database
-% i.e for two activites (A, B), A -> B
 %--
 
-add_causality_rec(_, []).
-add_causality_rec(State, [X|Out]) :- 
-    assert(has_causality(State, X)),
-    add_causality_rec(State, Out).
-
-add_causality([]).
-add_causality([Node|R]) :-
-    unpack_node(Node, State, _, Output),
-    add_causality_rec(State, Output),
-    add_causality(R).
-
-add_nodes([]).
-add_nodes([Node|Graph]) :-
+add_nodes([], _).
+add_nodes([Node|Graph], Method) :-
     unpack_node(Node, State, In, Out),
     select(Val, State, []),
-    assert(node(Val, In, Out)),
-    add_nodes(Graph).
-
-add_neg_nodes([]).
-add_neg_nodes([Node|Graph]) :-
-    unpack_node(Node, State, In, Out),
-    select(Val, State, []),
-    assert(neg_node(Val, In, Out)),
-    add_neg_nodes(Graph).
+    Pred =.. [Method, Val, In, Out],
+    assert(Pred),
+    add_nodes(Graph, Method).
 
 %-----------------------------------------------------------------------------
 % Adds the graphs' relations into the database
@@ -129,8 +110,7 @@ unpack_node([S, Ins, Outs], [Node], Ins, Outs) :-
     select(Node, S, []).
 
 create_database(Graph) :-
-    add_causality(Graph),
-    add_nodes(Graph).
+    add_nodes(Graph, node).
 
 %-----------------------------------------------------------------------------
 % Generate singleton trees from the graph 
@@ -173,6 +153,11 @@ connected(A, B, Caller) :-
 connected(A, B, Caller) :-
     retractall(visited(_)),
     path(B, A, Caller).
+
+% Returns true if there's a path between A and B
+link(A, B) :-
+    retractall(visited(_)),
+    path(A, B, node).
 
 %---
 % Path looks for a path between two graphs 
@@ -334,7 +319,7 @@ negate_states([G|Graph], [[A, NewOut, NewIn]|NegGraph]) :-
 negate_graph(Graph, NegGraph) :-
     full_graph(Graph, Full),
     negate_states(Full, NegGraph),
-    add_neg_nodes(NegGraph).
+    add_nodes(NegGraph, neg_node).
 
 % Removes an element from the full graph
 remove_elt(_, [], []).
@@ -366,6 +351,8 @@ parallel_cut_sub([G|Graph], [C|NewGraphs]) :-
 parallel_cut(Graph, par, NewGraphs) :-
     negate_graph(Graph, NegGraph),
     parallel_cut_sub(NegGraph, NewGraphs),
+    retractall(neg_node(_, _, _)),
+    !,
     NewGraphs \= Graph.
 
 %-----------------------------------------------------------------------------
@@ -383,6 +370,109 @@ base_cut(Graph, Base) :-
 % Set of functions performing a LOOP CUT. 
 %--
 
+activities_sub(_, _, [], []).
+activities_sub('start', Graph, [Elt|Node], [Elt|Res]) :-
+    node(Elt, In, _),
+    flatten(Graph, FlatGraph),
+    \+ subset(In, FlatGraph),
+    activities_sub('start', Graph, Node, Res).
+activities_sub('end', Graph, [Elt|Node], [Elt|Res]) :-
+    node(Elt, _, Out),
+    flatten(Graph, FlatGraph),
+    \+ subset(Out, FlatGraph),
+    activities_sub('end', Graph, Node, Res).
+activities_sub(Type, Graph, [_|Node], Res) :-
+    activities_sub(Type, Graph, Node, Res).
+
+activities(_, _, [], []).
+activities(Type, Base, [G|Graph], Activities) :-
+    activities_sub(Type, Base, G, L1),
+    activities(Type, Base, Graph, L2),
+    append(L1, L2, Activities).
+
+% Removes the loop body from the full_graph's transitions
+remove_transitions(_, [], []).
+remove_transitions(Body, [G|Graph], [[A, NewIn, NewOut]|Res]) :-
+    unpack_node(G, A, In, Out),
+    subtract(In, Body, NewIn),
+    subtract(Out, Body, NewOut),
+    remove_transitions(Body, Graph, Res).
+
+% Removes the loop body from the graph
+remove_body(_, [], []).
+remove_body(Body, [G1|Graph], [G2|Res]) :-
+    subtract(G1, Body, G2),
+    remove_body(Body, Graph, Res).
+
+loop_components(CC, [], CC).
+loop_components(A, [G|Graph], Res) :-
+    connected(A, G, loop_node),
+    append(A, G, CC),
+    loop_components(CC, Graph, Res).
+loop_components(A, [_|Graph], Res) :-
+    loop_components(A, Graph, Res).
+
+% Puts a graph in the form [[a], [b,c]] to the form
+% [[a], [b], [c]]
+deconstruct_graph([], []).
+deconstruct_graph([G|Graph], [A|Res]) :-
+    unpack_node(G, A, _, _),
+    deconstruct_graph(Graph, Res).
+
+loop_cc_sub([], []).
+loop_cc_sub([A|Graph], [Res|CC]) :-
+    loop_components(A, Graph, Res),
+    remove_nodes(Res, Graph, G1),
+    loop_cc_sub(G1, CC).
+
+% Computes the loop's connected components
+% by getting the start & end activities of the loop
+% and removing them from the graph
+loop_cc(Graph, Start, End, CC) :-
+    activities('start', Graph, Graph, Start), % Gets start activities
+    activities('end', Graph, Graph, End),
+    append(Start, End, TempBody),
+    remove_body(TempBody, Graph, Res), % Removes Start & End activities
+    full_graph(Res, FullGraph),
+    remove_transitions(TempBody, FullGraph, ReducedGraph),
+    add_nodes(ReducedGraph, loop_node),
+    deconstruct_graph(ReducedGraph, Deconstructed),
+    loop_cc_sub(Deconstructed, CC).
+
+redo([], _, _, []).
+redo([C|Component], Start, End, [C|Body]) :-
+    link(End, C),
+    link(C, Start),
+    redo(Component, Start, End, Body).
+redo([_|Component], Start, End, Body) :-
+    redo(Component, Start, End, Body).
+
+body([], _, _, []).
+body([C|Component], Start, End, [C|Body]) :-
+    link(Start, C),
+    link(C, End),
+    body(Component, Start, End, Body).
+body([_|Component], Start, End, Body) :-
+    body(Component, Start, End, Body).
+
+reachability(Components, Start, End, [Body, Redo]) :-
+    body(Components, Start, End, TempBody),
+    redo(Components, Start, End, Redo),
+    append(Start, TempBody, B1),
+    append(B1, End, Body).
+
+
+% Tells whether an activity is the body part of the loop
+% or the redo part
+
+loop_cut_sub(Graph, NewGraphs) :-
+    loop_cc(Graph, Start, End, Components),
+    reachability(Components, Start, End, NewGraphs).
+
+loop_cut(Graph, loop, NewGraphs) :-
+    loop_cut_sub(Graph, NewGraphs),
+    NewGraphs \= Graph.
+
 %=============================================================================
 % imd is the main_algorithm 
 % first, it looks for a base case for the graph, if not found, 
@@ -396,6 +486,8 @@ find_cut(Graph, Operator, NewGraphs) :-
     sequential_cut(Graph, Operator, NewGraphs).
 find_cut(Graph, Operator, NewGraphs) :-
     parallel_cut(Graph, Operator, NewGraphs).
+find_cut(Graph, Operator, NewGraphs) :-
+    loop_cut(Graph, Operator, NewGraphs).
 
 % Splits transforms sets from the cuts into graphs,
 % i.e  [b, c, d, e] becomes [[b, c, d, e]]
@@ -429,6 +521,14 @@ test1 :-
 
 test2 :-
     Logs=[[a, b, c, d], [a, c, b, d]], 
+    create_alphabet(Logs, States),
+    generate_graph(Logs, States, Graph),
+    create_database(Graph),
+    generate_trees(Graph, Trees),
+    imd(Trees, _).
+
+testloop :-
+    Logs=[[a, b, c, d, e, f, b, c, d, e, h]],
     create_alphabet(Logs, States),
     generate_graph(Logs, States, Graph),
     create_database(Graph),
