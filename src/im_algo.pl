@@ -154,11 +154,6 @@ connected(A, B, Caller) :-
     retractall(visited(_)),
     path(B, A, Caller).
 
-% Returns true if there's a path between A and B
-link(A, B) :-
-    retractall(visited(_)),
-    path(A, B, node).
-
 %---
 % Path looks for a path between two graphs 
 % The graphs are lists which contains one or many nodes 
@@ -447,18 +442,53 @@ redo([C|Component], Start, End, [C|Body]) :-
 redo([_|Component], Start, End, Body) :-
     redo(Component, Start, End, Body).
 
-body([], _, _, []).
-body([C|Component], Start, End, [C|Body]) :-
-    link(Start, C),
-    link(C, End),
-    body(Component, Start, End, Body).
-body([_|Component], Start, End, Body) :-
-    body(Component, Start, End, Body).
+
+% Returns the path just inserted in the database
+retrieve_path([X|Res]) :-
+    retract(visited(X)),
+    retrieve_path(Res).
+retrieve_path([]).
+
+% C is part of the loop body if it reaches the start states
+% by going through at least one end state
+is_body(C, Start, End) :-
+    retractall(visited(_)),
+    path(C, Start, node),
+    retrieve_path(Path),
+    !,
+    intersection(Path, End, Res),
+    \+ length(Res, 0).
+
+% C is part of the loop redo if it reaches the end states
+% by going through at least one start state
+is_redo(C, Start, End) :-
+    retractall(visited(_)),
+    path(C, End, node),
+    retrieve_path(Path),
+    !,
+    intersection(Path, Start, Res),
+    \+ length(Res, 0).
+
+body_redo([], _, _, [], []).
+body_redo([C|Component], Start, End, [C|Body], Redo) :-
+    is_body(C, Start, End),
+    body_redo(Component, Start, End, Body, Redo).
+body_redo([C|Component], Start, End, Body, [C|Redo]) :-
+    is_redo(C, Start, End),
+    body_redo(Component, Start, End, Body, Redo).
 
 reachability(Components, Start, End, [Body, Redo]) :-
-    body(Components, Start, End, TempBody),
-    redo(Components, Start, End, Redo),
-    append(Start, TempBody, B1),
+    body_redo(Components, Start, End, TempBody, TempRedo),
+    flatten(TempBody, FlatBody),
+    flatten(TempRedo, Redo),
+    \+ length(Redo, 0), % If no redo, we must use the second clause
+    append(Start, FlatBody, B1),
+    append(B1, End, Body).
+
+reachability(Components, Start, End, [Body]) :-
+    body_redo(Components, Start, End, TempBody, _),
+    flatten(TempBody, FlatBody),
+    append(Start, FlatBody, B1),
     append(B1, End, Body).
 
 
@@ -471,6 +501,7 @@ loop_cut_sub(Graph, NewGraphs) :-
 
 loop_cut(Graph, loop, NewGraphs) :-
     loop_cut_sub(Graph, NewGraphs),
+    !,
     NewGraphs \= Graph.
 
 %=============================================================================
@@ -508,6 +539,8 @@ imd(Graph, Script) :-
     split(Cuts, SubGraphs),
     imd_sub(SubGraphs, NewGraphs),
     Script =.. [Operator, NewGraphs].
+imd(Graph, Script) :- % If no cuts were found, just return the set
+    flatten(Graph, Script).
 
 test1 :-
     Logs=[[a, b, c, f, g, h, i], [a, b, c, g, h, f, i], [a, b, c, h, f, g, i],
