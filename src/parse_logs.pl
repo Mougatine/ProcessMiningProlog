@@ -6,24 +6,18 @@
 % and parsing the input
 %--
 
-lines([]) --> call(eos), !.
-lines([Line|Lines]) --> line(Line), lines(Lines).
+line(Logs) --> "[", logs(Logs), "]".
 
-eos([], []).
+logs(Logs) --> event(Logs).
+logs(Logs) --> event(X), ", ", logs(Y), { append(X, Y, Logs)}.
 
-line([]) --> ( "\n" ; call(eos) ), !.
-line([Log|Ls]) --> "[", log(Log), "]", line(Ls).
+event([Logs]) --> "<", op_list(Logs), ">". 
 
-log(Log) --> event(Log).
-log([X,Log]) --> event(X), ", ", log(Log).
-
-event(Log) --> "<", op_list(X), ">", { flatten(X, Log) }.
-
-op_list([Log]) --> elt(Log).
-op_list([X, Log]) --> elt(X), ", ", op_list(Log).
+op_list([Logs]) --> elt(Logs).
+op_list([X|Logs]) --> elt(X), ", ", op_list(Logs).
 
 elt(Arg) --> [X], { atom_codes(Arg, [X]) }.
 
 % read_file reads a file content until EOF, and then closes it
 read_logs(Path, Logs) :-
-    phrase_from_file(lines(Logs), Path).
+    phrase_from_file(line(Logs), Path).

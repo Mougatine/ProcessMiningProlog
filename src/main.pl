@@ -1,10 +1,11 @@
 :- use_module(parse_logs).
-:- consult('parse_script.pl').
 :- consult('im_algo.pl').
 
-main(FileName) :-
-  test1(Script),
+script_from_file(LogFile, WriteFile) :-
+  read_logs(LogFile, Logs),
+  generate_model(Logs, Graph),
+  model_script(Graph, Script),
   setup_call_cleanup(
-    open(FileName, write, File),
+    open(WriteFile, write, File),
     write_sequence(File, Script),
     close(File)).
