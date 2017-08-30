@@ -1,8 +1,8 @@
-:- module(file_reader, [read_file/2]).
+:- module(parse_script, [read_script/2]).
 :- use_module(library(pio)).
 
 %-----------------------------------------------------------------------------
-% Module file containing methods for reading log files
+% Module file containing methods for reading event script files
 % and parsing the input
 %--
 
@@ -66,5 +66,5 @@ build_term(Operation, Args, Term) :-
     Term =.. Res.
 
 % read_file reads a file content until EOF, and then closes it
-read_file(Path, Logs) :-
+read_script(Path, Logs) :-
     phrase_from_file(lines(Logs), Path).

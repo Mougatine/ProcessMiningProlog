@@ -1,4 +1,4 @@
-:- use_module(file_reader).
+:- use_module(parse_logs).
 
 main(Path) :-
-    read_file(Path, _).
+    read_logs(Path, _).
