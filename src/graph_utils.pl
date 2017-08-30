@@ -1,5 +1,6 @@
 :- module(graph_utils, [unpack_node/4, state_inputs/3, state_outputs/3, generate_graph/3,
-                        activities/4, order_graph/2, ssc/2, not_connected/2, connected/3]).
+                        activities/4, order_graph/2, ssc/2, not_connected/2, connected/3,
+                        directed_path/2]).
 
 %=============================================================================
 % Module file containing methods for Graph manipulation
@@ -38,6 +39,11 @@ connected(A, B, Caller) :-
 connected(A, B, Caller) :-
     retractall(visited(_)),
     path(B, A, Caller).
+
+% True if there's a path between A and B
+directed_path(A, B) :-
+    retractall(visited(_)),
+    path(A, B, node).
 
 %-----------------------------------------------------------------------------
 % Generates a list representing a graph node, its inputs and outputs 
@@ -97,7 +103,7 @@ activities_sub('start', Graph, [Elt|Clique], [Elt|Res]) :-
     activities_sub('start', Graph, Clique, Res).
 activities_sub('end', Graph, [Elt|Clique], [Elt|Res]) :-
     node(Elt, _, Out),
-    \+ subset(Out, Graph),
+    (\+ subset(Out, Graph); length(Out, 0)),
     activities_sub('end', Graph, Clique, Res).
 activities_sub(Type, Graph, [_|Clique], Res) :-
     activities_sub(Type, Graph, Clique, Res).

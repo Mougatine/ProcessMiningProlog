@@ -174,12 +174,33 @@ merge_graphs([T|SubTrees], [G|NewGraphs]) :-
     remove_nodes(G, SubTrees, Res),
     merge_graphs(Res, NewGraphs).
 
+% The sequential cut is valid if, for all components i and j,
+% i != j, if i -> j then j -x-> i
+is_sequential_cut_sub(_, []).
+is_sequential_cut_sub(G, [H|List]) :-
+    directed_path(G, H),
+    \+ directed_path(H, G),
+    is_sequential_cut_sub(G, List).
+is_sequential_cut_sub(G, [H|List]) :-
+    directed_path(H, G),
+    \+ directed_path(G, H),
+    is_sequential_cut_sub(G, List).
+
+% Remove G from the graph otherwise the check is not valid 
+% since the condition i != j will not hold
+is_sequential_cut([], _).
+is_sequential_cut([G|List], Graph) :-
+    subtract(Graph, [G], Tmp), 
+    is_sequential_cut_sub(G, Tmp),
+    is_sequential_cut(List, Graph).
+
 % Finds the ssc (strongly connected components)
 % then merges the ssc's which are not connected at all
 sequential_cut(Graph, seq, NewGraphs) :-
     sequential_cut_sub(Graph, SubTrees),
     merge_graphs(SubTrees, NewGraphs),
-    NewGraphs \= Graph.
+    !,
+    is_sequential_cut(NewGraphs, NewGraphs).
 
 %-----------------------------------------------------------------------------
 % Set of functions performing an EXCLUSIVE CUT. 
@@ -188,6 +209,7 @@ sequential_cut(Graph, seq, NewGraphs) :-
 % Fails if there a no changes (No cuts were found)
 %--
 
+% Finds the sscs in the graph
 divide_node_sub(_, [], []).
 divide_node_sub(Elt, [X|L], [X|Res]) :-
     ssc(Elt, X),
@@ -208,10 +230,22 @@ exclusive_cut_sub([G|Graph], NewGraphs) :-
     exclusive_cut_sub(Graph, G2),
     append(G1, G2, NewGraphs).
 
+% Checks if the cut is valid, i.e that the computed sscs
+% never reach each other
+is_exclusive_cut_sub(_, []).
+is_exclusive_cut_sub(G, [H|List]) :-
+    not_connected(G, H),
+    is_exclusive_cut_sub(G, List).
+
+is_exclusive_cut([], _).
+is_exclusive_cut([G|List], Graph) :-
+    is_exclusive_cut_sub(G, Graph),
+    is_exclusive_cut(List, Graph).
+
 exclusive_cut(Graph, alt, NewGraphs) :-
     exclusive_cut_sub(Graph, NewGraphs),
     !,
-    NewGraphs \= Graph.
+    is_exclusive_cut(NewGraphs, NewGraphs).
 
 %-----------------------------------------------------------------------------
 % Set of functions performing a CONCURRENT CUT. 
@@ -289,13 +323,13 @@ parallel_cut_sub([G|Graph], [C|NewGraphs]) :-
 % The parallel cut is valid if for each cluster :
 % The intersection between the cluster and the start set is not empty
 % The intersection between the cluster and the end set is not empty
-is_parallel([], _, _).
-is_parallel([G|Graph], Start, End) :-
+is_parallel_cut([], _, _).
+is_parallel_cut([G|Graph], Start, End) :-
     intersection(Start, G, StartIntersect),
     \+ length(StartIntersect, 0),
     intersection(End, G, EndIntersect),
     \+ length(EndIntersect, 0),
-    is_parallel(Graph, Start, End).
+    is_parallel_cut(Graph, Start, End).
 
 % Negates the graph and computes the parallel components
 parallel_cut(Graph, par, NewGraphs) :-
@@ -304,7 +338,8 @@ parallel_cut(Graph, par, NewGraphs) :-
     negate_graph(Graph, NegGraph),
     parallel_cut_sub(NegGraph, NewGraphs),
     !,
-    is_parallel(NewGraphs, Start, End),
+    \+ length(NewGraphs, 1), % A parallel cut cannot yield a single component
+    is_parallel_cut(NewGraphs, Start, End),
     retractall(neg_node(_, _, _)),
     NewGraphs \= Graph.
 
@@ -425,6 +460,7 @@ reachability(Components, Start, End, [Body]) :-
 
 loop_cut_sub(Graph, NewGraphs) :-
     loop_cc(Graph, Start, End, Components),
+    !,
     reachability(Components, Start, End, NewGraphs).
 
 loop_cut(Graph, loop, NewGraphs) :-
