@@ -433,6 +433,56 @@ loop_cut(Graph, loop, NewGraphs) :-
     NewGraphs \= Graph.
 
 %=============================================================================
+% Writes the result of the IM Algorithm into a file 
+%--
+
+% Writes a terminal term to the file
+write_operator(File, seq, 'Op') :-
+    write(File, 'SEQ(').
+write_operator(File, alt, 'Op') :-
+    write(File, 'ALT(').
+write_operator(File, par, 'Op') :-
+    write(File, 'PAR(').
+write_operator(File, loop, 'Op') :-
+    write(File, 'LOOP(').
+write_operator(File, Script, 'Term') :-
+    Script =.. List,
+    length(List, 1), % Terminal value 
+    write(File, Script).
+
+% Writes a separator between function arguments
+% only if there are other args left
+write_args_separator(File, FlatArgs, Type) :-
+    Type == 'Term',
+    \+ length(FlatArgs, 0),
+    write(File, ', ').
+write_args_separator(_, _, _).
+
+write_separator(File, Args) :-
+    \+ length(Args, 0),
+    write(File, ', ').
+write_separator(_, _).
+
+% Iterates through function args and writes them to the file
+write_args(_, []).
+write_args(File, [A|Args]) :-
+    write_operator(File, A, Type),
+    flatten(Args, FlatArgs),
+    write_args_separator(File, FlatArgs, Type),
+    write_args(File, FlatArgs).
+write_args(File, [A|Args]) :-
+    write_sequence(File, A),
+    write_separator(File, Args),
+    write_args(File, Args).
+
+% Write a sequence into the file
+% A sequence contains an operator and an argument list
+write_sequence(File, Script) :-
+   Script =.. List,
+   write_args(File, List), 
+   write(File, ')').
+
+%=============================================================================
 % imd is the main_algorithm 
 % first, it looks for a base case for the graph, if not found, 
 % it tries different cut methods
@@ -471,7 +521,7 @@ imd(Graph, Script) :- % No cuts -> Returns a loop (as in the paper)
     flatten(Graph, FlatGraph),
     Script =.. [loop, FlatGraph].
 
-test1 :-
+test1(Script) :-
     Logs=[[a, b, c, f, g, h, i], [a, b, c, g, h, f, i], [a, b, c, h, f, g, i],
           [a, c, b, f, g, h, i], [a, c, b, g, h, f, i], [a, c, b, h, f, g, i],
           [a, d, f, g, h, i], [a, d, e, d, g, h, f, i], [a, d, e, d, e, d, h, f, g, i]],
@@ -480,7 +530,7 @@ test1 :-
     create_database(Graph),
     order_graph(Graph, OrderedGraph),
     generate_trees(OrderedGraph, Trees),
-    imd(Trees, _).
+    imd(Trees, Script).
 
 test2 :-
     Logs=[[a, b, c, d], [a, c, b, d]], 
@@ -491,11 +541,11 @@ test2 :-
     generate_trees(OrderedGraph, Trees),
     imd(Trees, _).
 
-testloop :-
+testloop(Script) :-
     Logs=[[a, b, c, d, e, f, b, c, d, e, h]],
     create_alphabet(Logs, States),
     generate_graph(Logs, States, Graph),
     create_database(Graph),
     order_graph(Graph, OrderedGraph),
     generate_trees(OrderedGraph, Trees),
-    imd(Trees, _).
+    imd(Trees, Script).
