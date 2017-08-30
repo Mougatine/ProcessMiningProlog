@@ -96,7 +96,7 @@ generate_graph(Logs, States, Graph) :-
 activities_sub(_, _, [], []).
 activities_sub('start', Graph, [Elt|Clique], [Elt|Res]) :-
     node(Elt, In, _),
-    \+ subset(In, Graph),
+    (\+ subset(In, Graph); length(In, 0)),
     activities_sub('start', Graph, Clique, Res).
 activities_sub('end', Graph, [Elt|Clique], [Elt|Res]) :-
     node(Elt, _, Out),
@@ -132,9 +132,41 @@ create_database(Graph) :-
 % Retrieves a node and its inputs/ouputs from the graph
 %--
 
-% Retrieves a node and its inputs/ouputs from the graph
 unpack_node([S, Ins, Outs], [Clique], Ins, Outs) :-
     select(Clique, S, []).
+
+%-----------------------------------------------------------------------------
+% Orders the graph using a DFS 
+%--
+
+get_start([], []).
+get_start([G|Graph], [Activity|Start]) :-
+    unpack_node(G, A, In, _),
+    select(Activity, A, []),
+    length(In, 0),
+    get_start(Graph, Start).
+get_start([_|Graph], Start) :-
+    get_start(Graph, Start).
+
+dfs([], []).
+dfs([N|Queue], [N|Res]) :-
+    unpack_node(N, Val, _, Out),
+    select(X, Val, []),
+    \+ visited(X),
+    assert(visited(X)),
+    full_graph_sub(Out, OutGraph),
+    append_list(Queue, OutGraph, NewQueue),
+    dfs(NewQueue, Res).
+dfs([_|Queue], Res) :-
+    dfs(Queue, Res).
+
+order_graph(Graph, OrderedGraph) :-
+    get_start(Graph, Root),
+    select(A, Root, []),
+    node(A, In, Out),
+    dfs([[Root, In, Out]], OrderedGraph),
+    retractall(visited(_)).
+
 
 %-----------------------------------------------------------------------------
 % Generate singleton trees from the graph 
@@ -563,8 +595,7 @@ imd(Graph, Script) :-
     split(Cuts, SubGraphs),
     imd_sub(SubGraphs, NewGraphs),
     Script =.. [Operator, NewGraphs].
-% If no cuts were found, return a loop (it's what they do in the paper)
-imd(Graph, Script) :- 
+imd(Graph, Script) :- % No cuts -> Returns a loop (as in the paper) 
     flatten(Graph, FlatGraph),
     Script =.. [loop, FlatGraph].
 
@@ -575,7 +606,8 @@ test1 :-
     create_alphabet(Logs, States),
     generate_graph(Logs, States, Graph),
     create_database(Graph),
-    generate_trees(Graph, Trees),
+    order_graph(Graph, OrderedGraph),
+    generate_trees(OrderedGraph, Trees),
     imd(Trees, _).
 
 test2 :-
@@ -583,7 +615,8 @@ test2 :-
     create_alphabet(Logs, States),
     generate_graph(Logs, States, Graph),
     create_database(Graph),
-    generate_trees(Graph, Trees),
+    order_graph(Graph, OrderedGraph),
+    generate_trees(OrderedGraph, Trees),
     imd(Trees, _).
 
 testloop :-
@@ -591,5 +624,6 @@ testloop :-
     create_alphabet(Logs, States),
     generate_graph(Logs, States, Graph),
     create_database(Graph),
-    generate_trees(Graph, Trees),
+    order_graph(Graph, OrderedGraph),
+    generate_trees(OrderedGraph, Trees),
     imd(Trees, _).
