@@ -200,6 +200,7 @@ sequential_cut(Graph, seq, NewGraphs) :-
     sequential_cut_sub(Graph, SubTrees),
     merge_graphs(SubTrees, NewGraphs),
     !,
+    \+ length(NewGraphs, 1), % A sequential cut cannot yield a single component
     is_sequential_cut(NewGraphs, NewGraphs).
 
 %-----------------------------------------------------------------------------
@@ -239,13 +240,15 @@ is_exclusive_cut_sub(G, [H|List]) :-
 
 is_exclusive_cut([], _).
 is_exclusive_cut([G|List], Graph) :-
-    is_exclusive_cut_sub(G, Graph),
+    subtract(Graph, [G], G1), 
+    is_exclusive_cut_sub(G, G1),
     is_exclusive_cut(List, Graph).
 
 exclusive_cut(Graph, alt, NewGraphs) :-
     exclusive_cut_sub(Graph, NewGraphs),
     !,
-    is_exclusive_cut(NewGraphs, NewGraphs).
+    is_exclusive_cut(NewGraphs, NewGraphs),
+    NewGraphs \= Graph. % No changes -> Failure
 
 %-----------------------------------------------------------------------------
 % Set of functions performing a CONCURRENT CUT. 
@@ -569,7 +572,6 @@ write_sequence(File, Script) :-
    Script =.. List,
    write_args(File, List), 
    write(File, ')').
-
 
 test1(Script) :-
     Logs=[[a, b, c, f, g, h, i], [a, b, c, g, h, f, i], [a, b, c, h, f, g, i],
