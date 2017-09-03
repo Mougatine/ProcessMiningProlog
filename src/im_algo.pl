@@ -511,7 +511,14 @@ imd(Graph, Script) :- % No cuts -> Returns a loop (as in the paper)
     Script =.. [loop, FlatGraph].
 
 %=============================================================================
-% Generates a model from the logs 
+% Generates a model from the logs  + a dot file form the graph
+generate_model_with_dot(Logs, DotFileName, Graph) :-
+    create_alphabet(Logs, States),
+    generate_graph(Logs, States, TempGraph),
+    create_database(TempGraph),
+    order_graph(TempGraph, Graph),
+    write_dot(Graph, DotFileName).
+
 generate_model(Logs, Graph) :-
     create_alphabet(Logs, States),
     generate_graph(Logs, States, TempGraph),

@@ -1,6 +1,6 @@
 :- module(graph_utils, [unpack_node/4, state_inputs/3, state_outputs/3, generate_graph/3,
                         activities/4, order_graph/2, ssc/2, not_connected/2, connected/3,
-                        directed_path/2]).
+                        directed_path/2, write_dot/2]).
 
 %=============================================================================
 % Module file containing methods for Graph manipulation
@@ -146,3 +146,33 @@ order_graph(Graph, OrderedGraph) :-
     node(A, In, Out),
     dfs([[Root, In, Out]], OrderedGraph),
     retractall(visited(_)).
+
+%-----------------------------------------------------------------------------
+% Writes the graph into a dot file 
+%--
+
+write_node(_, [], _).
+write_node(Node, [O|Out], File) :-
+    write(File, Node),
+    write(File, ' -> '),
+    write(File, O),
+    write(File, ';\n'),
+    write_node(Node, Out, File).
+
+write_graph_sub([], _).
+write_graph_sub([G|Graph], File) :-
+    unpack_node(G, A, _, Out),
+    select(Node, A, []),
+    write_node(Node, Out, File),
+    write_graph_sub(Graph, File).
+
+write_graph(Graph, File) :-
+    write(File, 'digraph G {\n'),
+    write_graph_sub(Graph, File),
+    write(File, '}\n').
+
+write_dot(Graph, FileName) :-
+  setup_call_cleanup(
+    open(FileName, write, File),
+    write_graph(Graph, File),
+    close(File)).
