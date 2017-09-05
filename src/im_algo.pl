@@ -2,15 +2,25 @@
 
 clearall :-
     retractall(visited(_)),
-    retractall(node(_, _, _)),
+    retractall(node(_, _, _, _)),
     retractall(neg_node(_, _, _)),
-    retractall(loop_node(_, _, _)).
+    retractall(loop_node(_, _, _)),
+    retractall(current_graph(_)).
 
-:- dynamic (visited/1, node/3, neg_node/3, loop_node/3), clearall.
+:- dynamic (visited/1, node/4, neg_node/3, loop_node/3, current_graph/1), clearall.
 
 %-----------------------------------------------------------------------------
 % Misc functions.
 %--
+
+incr(X, NX) :-
+    NX is X + 1.
+
+first([X|_], X).
+
+retrieve_id(Id) :-
+    current_graph(Id),
+    !.
 
 % Check if the element exist
 member(X, [X|_]).
@@ -32,14 +42,10 @@ append_list([X|L1], L2, L) :-
   unique_add(X, R, L).
 
 % Create alphabet
-create_alphabet_sub([], []).
-create_alphabet_sub([X|L], [X|A]) :-
-  create_alphabet_sub(L, A).
-create_alphabet([], []).
-create_alphabet([L|R], A) :-
-  create_alphabet_sub(L, Ret_L),
-  create_alphabet(R, Ret_R),
-  append_list(Ret_L, Ret_R, A).
+create_alphabet([], L, L).
+create_alphabet([L|R], Acc, Res) :-
+    append_list(Acc, [L], AccBis),
+    create_alphabet(R, AccBis, Res).
 
 %=============================================================================
 % Inductive Mining algorithm
@@ -51,21 +57,22 @@ create_alphabet([L|R], A) :-
 % and c,d the outputs 
 %--
 
-add_nodes([], _).
-add_nodes([Clique|Graph], Method) :-
+add_nodes(_, [], _).
+add_nodes(Id, [Clique|Graph], Method) :-
     unpack_node(Clique, State, In, Out),
     select(Val, State, []),
-    Pred =.. [Method, Val, In, Out],
+    Pred =.. [Method, Id, Val, In, Out],
     assert(Pred),
-    add_nodes(Graph, Method).
+    add_nodes(Id, Graph, Method).
 
 create_database(Graph) :-
-    add_nodes(Graph, node).
-
+    graph_id(Graph, Id, G),
+    add_nodes(Id, G, node).
 
 %-----------------------------------------------------------------------------
 % Generate singleton trees from the graph 
 %--
+
 generate_trees([], []).
 generate_trees([Clique|Graph], [Val|Res]) :-
     unpack_node(Clique, Val, _, _),
@@ -129,7 +136,8 @@ path(A, Target, Caller) :-
     \+ is_list(Target),
     \+ visited(A),
     assert(visited(A)),
-    call(Caller, A, _, Out),
+    retrieve_id(Id),
+    call(Caller, Id, A, _, Out),
     path_sub(A, Target, Out, Caller).
 
 % Returns the strongly connected component
@@ -261,15 +269,15 @@ exclusive_cut(Graph, alt, NewGraphs) :-
 % Returns the full graph from the graph passed as parameter
 % i.e for each node, we get the input and output nodes
 % For instance, [a] becomes [[a], [], [b, c]] with b and c the outputs
-full_graph_sub([], []).
-full_graph_sub([N|Cliques], [[[N], In, Out]|Res]) :-
-    node(N, In, Out),
-    full_graph_sub(Cliques, Res).
+full_graph_sub(_, [], []).
+full_graph_sub(Id, [N|Cliques], [[[N], In, Out]|Res]) :-
+    node(Id, N, In, Out),
+    full_graph_sub(Id, Cliques, Res).
 
-full_graph([], []).
-full_graph([G|Graph], Res) :-
-    full_graph_sub(G, L1),
-    full_graph(Graph, L2),
+full_graph(_, [], []).
+full_graph(Id, [G|Graph], Res) :-
+    full_graph_sub(Id, G, L1),
+    full_graph(Id, Graph, L2),
     append(L1, L2, Res).
 
 % For each node, switches the inputs and the ouputs
@@ -290,9 +298,10 @@ negate_states([G|Graph], [[A, NewOut, NewIn]|NegGraph]) :-
 
 % Computes the negated graph and saves it into the database
 negate_graph(Graph, NegGraph) :-
-    full_graph(Graph, Full),
+    retrieve_id(Id),
+    full_graph(Id, Graph, Full),
     negate_states(Full, NegGraph),
-    add_nodes(NegGraph, neg_node).
+    add_nodes(Id, NegGraph, neg_node).
 
 % Removes an element from the full graph
 % for instance, if A = [a], removes the node [[a], [x], [x]]
@@ -399,13 +408,14 @@ loop_cc_sub([A|Graph], [Res|CC]) :-
     loop_cc_sub(G1, CC).
 
 loop_cc(Graph, Start, End, CC) :-
+    retrieve_id(Id),
     activities('start', Graph, Graph, Start), % Gets start activities
     activities('end', Graph, Graph, End),
     append_list(Start, End, TempBody),
     remove_body(TempBody, Graph, Res), % Removes Start & End activities
-    full_graph(Res, FullGraph),
+    full_graph(Id, Res, FullGraph),
     remove_transitions(TempBody, FullGraph, ReducedGraph),
-    add_nodes(ReducedGraph, loop_node),
+    add_nodes(Id, ReducedGraph, loop_node),
     deconstruct_graph(ReducedGraph, Deconstructed),
     loop_cc_sub(Deconstructed, CC).
 
@@ -511,24 +521,62 @@ imd(Graph, Script) :- % No cuts -> Returns a loop (as in the paper)
     Script =.. [loop, FlatGraph].
 
 %=============================================================================
-% Generates a model from the logs  + a dot file form the graph
-generate_model_with_dot(Logs, DotFileName, Graph) :-
-    create_alphabet(Logs, States),
-    generate_graph(Logs, States, TempGraph),
-    create_database(TempGraph),
-    order_graph(TempGraph, Graph),
-    write_dot(Graph, DotFileName).
+% Generates graphs from the logs  + a dot file form the graph
 
-generate_model(Logs, Graph) :-
-    create_alphabet(Logs, States),
-    generate_graph(Logs, States, TempGraph),
-    create_database(TempGraph),
-    order_graph(TempGraph, Graph).
+
+% Retrieves a graph with the same start as the logs
+existing_graph_sub(Start, [G|_], G) :-
+    graph_id(G, _, Graph),
+    first(Graph, First),
+    unpack_node(First, A, _, _),
+    select(Val, A, []),
+    Val == Start.
+existing_graph_sub(Start, [_|List], Res) :-
+    existing_graph_sub(Start, List, Res).
+
+existing_graph([Start|_], List, Graph) :-
+    existing_graph_sub(Start, List, Graph).
+
+% If the graph with the same start already exists, complete it
+generate_graph(Log, States, Id, Id, L1, [Graph|L2]) :-
+    existing_graph(Log, L1, G),
+    delete(L1, G, L2),
+    complete_graph(Log, States, G, Graph).
+
+generate_graph(L, States, Id, NewId, List, [Graph|List]) :-
+    create_graph(L, States, G1),
+    append([Id], G1, G2),
+    incr(Id, NewId),
+    create_database(G2),
+    order_graph(Id, L, Graph).
+
+generate_model([], _, L, L).
+generate_model([L|Logs], GraphId, List, Res) :-
+    create_alphabet(L, [], States),
+    generate_graph(L, States, GraphId, NewId, List, NewList),
+    generate_model(Logs, NewId, NewList, Res).
 
 % Generates the script from the model
-model_script(Graph, Script) :-
-    generate_trees(Graph, Trees),
-    imd(Trees, Script).
+scripts_sub(Graph, Script) :-
+    graph_id(Graph, Id, G),
+    assert(current_graph(Id)),
+    generate_trees(G, Trees),
+    imd(Trees, Script),
+    retractall(current_graph(_)).
+
+scripts([], []).
+scripts([G|Graphs], [Res|Script]) :-
+    scripts_sub(G, Res),
+    scripts(Graphs, Script).
+
+model_script(Graphs, Script) :-
+    length(Graphs, 1),
+    scripts(Graphs, Res),
+    select(Script, Res, []).
+
+model_script(Graphs, Script) :-
+    scripts(Graphs, Res),
+    Script =.. [alt, Res].
 
 %=============================================================================
 % Writes the result of the IM Algorithm into a file 
