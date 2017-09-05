@@ -16,6 +16,11 @@ and return an event script describing the model.
 
 # How to launch the program
 
+*To create a model from the logs and print the corresponding script:*
+`./main.pl path_to_file_with_logs output_file`
+
+*To create a model from the logs, print it to a dot file and print the corresponding script:*
+`./main.pl path_to_file_with_logs output_file -d output_dotfile`
 
 # Implementation details
 The process discovery is done using the Inductive Mining Algorithm, created by Leemans et al.,2016 and described in
