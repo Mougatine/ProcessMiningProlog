@@ -180,40 +180,53 @@ order_graph(Id, Logs, OrderedGraph) :-
 % Writes the graph into a dot file 
 %--
 
-write_color(Node, File) :-
-    write(File, Node),
-    write(File, ' [style=filled, fillcolor = yellow]\n').
+write_start_link(Id, Graph, File) :-
+    first(Graph, Node),
+    unpack_node(Node, A, _, _),
+    select(Val, A, []),
+    write(File, 'Start -> '),
+    write(File, Val),
+    write(File, Id),
+    write(File, ';\n').
 
-write_node(_, [], _).
-write_node(Node, [O|Out], File) :-
+write_node(_, _, [], _).
+write_node(Id, Node, [O|Out], File) :-
     write(File, Node),
+    write(File, Id),
     write(File, ' -> '),
     write(File, O),
+    write(File, Id),
     write(File, ';\n'),
-    write_node(Node, Out, File).
+    write_node(Id, Node, Out, File).
 
-write_graph_sub([], _).
-write_graph_sub([G|Graph], File) :-
-    unpack_node(G, A, In, Out),
-    select(Node, A, []),
-    length(In, 0),
-    write_color(Node, File),
-    write_node(Node, Out, File),
-    write_graph_sub(Graph, File).
-write_graph_sub([G|Graph], File) :-
+write_graph_sub(_, [], _).
+write_graph_sub(Id, [G|Graph], File) :-
     unpack_node(G, A, _, Out),
     select(Node, A, []),
-    write_node(Node, Out, File),
-    write_graph_sub(Graph, File).
+    write_node(Id, Node, Out, File),
+    write_graph_sub(Id, Graph, File).
 
+write_graph_sub(Id, [G|Graph], File) :-
+    unpack_node(G, A, _, Out),
+    select(Node, A, []),
+    write_node(Id, Node, Out, File),
+    write_graph_sub(Id, Graph, File).
 
-write_graph(Graph, File) :-
+write_graph_header([], _).
+write_graph_header([G1|Graphs], File) :-
+    graph_id(G1, Id, G2),
+    write_start_link(Id, G2, File),
+    write_graph_sub(Id, G2, File),
+    write_graph_header(Graphs, File).
+
+write_graph(Graphs, File) :-
     write(File, 'digraph G {\n'),
-    write_graph_sub(Graph, File),
+    write(File, 'Start [style=filled, fillcolor = yellow]\n'),
+    write_graph_header(Graphs, File),
     write(File, '}\n').
 
-write_dot(Graph, FileName) :-
+write_dot(Graphs, FileName) :-
   setup_call_cleanup(
     open(FileName, write, File),
-    write_graph(Graph, File),
+    write_graph(Graphs, File),
     close(File)).

@@ -521,10 +521,14 @@ imd(Graph, Script) :- % No cuts -> Returns a loop (as in the paper)
     Script =.. [loop, FlatGraph].
 
 %=============================================================================
-% Generates graphs from the logs  + a dot file form the graph
+% Header method of the IMD algorithm
+% If the resulting Script are generated from more than one graph, an 'alt' 
+% operator is added since those graphs are different possibilities
+% Otherwise the script is returned
 
-
+%-----------------------------------------------------------------------------
 % Retrieves a graph with the same start as the logs
+%--
 existing_graph_sub(Start, [G|_], G) :-
     graph_id(G, _, Graph),
     first(Graph, First),
@@ -537,7 +541,11 @@ existing_graph_sub(Start, [_|List], Res) :-
 existing_graph([Start|_], List, Graph) :-
     existing_graph_sub(Start, List, Graph).
 
+%-----------------------------------------------------------------------------
+% Generates the graphs from the logs.
 % If the graph with the same start already exists, complete it
+% Otherwise, create a new graph representing a new possibility
+%-- 
 generate_graph(Log, States, Id, Id, L1, [Graph|L2]) :-
     existing_graph(Log, L1, G),
     delete(L1, G, L2),
