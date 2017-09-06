@@ -34,3 +34,10 @@ This graph is then split up in smaller graphs using different cut operators:
 - Finally, the loop cut, which is composed of a body and redo activities.
 
 For example files, please take a look at the examples folder.
+
+# Test suite
+The test script will parse the input file and write the results into an output file.
+Then the output file will be parsed and its content compared to the file containing the results.
+
+To launch the test suite, open swipl, load the file *tests.pl* located in the test folder, 
+and call the predicate  *launch_tests/3* with the following parameters: LogFile, OutputFile, ResultFile.

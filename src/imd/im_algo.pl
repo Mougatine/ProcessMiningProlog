@@ -558,11 +558,16 @@ generate_graph(L, States, Id, NewId, List, [Graph|List]) :-
     create_database(G2),
     order_graph(Id, L, Graph).
 
-generate_model([], _, L, L).
-generate_model([L|Logs], GraphId, List, Res) :-
+generate_model_sub([], Id, Id, L, L).
+generate_model_sub([L|Logs], OldId, NewId, List, Res) :-
     create_alphabet(L, [], States),
-    generate_graph(L, States, GraphId, NewId, List, NewList),
-    generate_model(Logs, NewId, NewList, Res).
+    generate_graph(L, States, OldId, Id, List, NewList),
+    generate_model_sub(Logs, Id, NewId, NewList, Res).
+
+generate_model([], _, _, []).
+generate_model([Line|Lines], Id, List, [S1|Res]) :-
+    generate_model_sub(Line, Id, NewId, List, S1),
+    generate_model(Lines, NewId, [], Res).
 
 % Generates the script from the model
 scripts_sub(Graph, Script) :-
@@ -577,14 +582,19 @@ scripts([G|Graphs], [Res|Script]) :-
     scripts_sub(G, Res),
     scripts(Graphs, Script).
 
-model_script(Graphs, Script) :-
+model_script_sub(Graphs, Script) :-
     length(Graphs, 1),
     scripts(Graphs, Res),
     select(Script, Res, []).
 
-model_script(Graphs, Script) :-
+model_script_sub(Graphs, Script) :-
     scripts(Graphs, Res),
     Script =.. [alt, Res].
+
+model_script([], []).
+model_script([Graph|GraphList], [Res|Scripts]) :-
+    model_script_sub(Graph, Res),
+    model_script(GraphList, Scripts).
 
 %=============================================================================
 % Writes the result of the IM Algorithm into a file 
@@ -625,16 +635,23 @@ write_args(File, [A|Args]) :-
     write_args_separator(File, FlatArgs, Type),
     write_args(File, FlatArgs).
 write_args(File, [A|Args]) :-
-    write_sequence(File, A),
+    write_sequences_sub(File, A),
     write_separator(File, Args),
     write_args(File, Args).
 
 % Write a sequence into the file
 % A sequence contains an operator and an argument list
-write_sequence(File, Script) :-
+write_sequences_sub(File, Script) :-
    Script =.. List,
    write_args(File, List), 
    write(File, ')').
+
+write_sequences(_, []).
+write_sequences(File, [S|Scripts]) :-
+    write_sequences_sub(File, S),
+    write(File, '\n'),
+    flush_output(File),
+    write_sequences(File, Scripts).
 
 test1(Script) :-
     Logs=[[a, b, c, f, g, h, i], [a, b, c, g, h, f, i], [a, b, c, h, f, g, i],

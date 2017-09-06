@@ -1,8 +1,7 @@
 #!/usr/bin/env swipl
 
-:- use_module('./src/imd/parse_logs').
-:- consult('./src/imd/im_algo.pl').
-
+:- use_module('src/parsers/parse_logs').
+:- consult('src/imd/im_algo.pl').
 
 :- initialization main.
 
@@ -32,7 +31,7 @@ script_from_file(LogFile, WriteFile) :-
   model_script(Graphs, Script),
   setup_call_cleanup(
     open(WriteFile, write, File),
-    write_sequence(File, Script),
+    write_sequences(File, Script),
     close(File)).
 
 script_and_dot_from_file(LogFile, DotFile, WriteFile) :-
@@ -42,5 +41,5 @@ script_and_dot_from_file(LogFile, DotFile, WriteFile) :-
   model_script(Graphs, Script),
   setup_call_cleanup(
     open(WriteFile, write, File),
-    write_sequence(File, Script),
+    write_sequences(File, Script),
     close(File)).
