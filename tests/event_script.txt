@@ -1,0 +1,4 @@
+SEQ(a, b, c)
+ALT(LOOP(b, d), SEQ(a, b, c))
+SEQ(a, LOOP(d, e), f)
+SEQ(a, b, ALT(d, c))

@@ -33,7 +33,7 @@ This graph is then split up in smaller graphs using different cut operators:
 - The parallel cut, where A and B can appear in any intertwined order.
 - Finally, the loop cut, which is composed of a body and redo activities.
 
-For example files, please take a look at the examples folder.
+For example files, please take a look at the tests folder.
 
 # Test suite
 The test script will parse the input file and write the results into an output file.

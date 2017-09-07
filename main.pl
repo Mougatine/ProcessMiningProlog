@@ -26,6 +26,7 @@ parse_argv(_) :-
   write('ERROR: Please follow the usage specified in the README').
 
 script_from_file(LogFile, WriteFile) :-
+  clearall,
   read_logs(LogFile, Logs),
   generate_model(Logs, 1, [], Graphs),
   model_script(Graphs, Script),
@@ -35,6 +36,7 @@ script_from_file(LogFile, WriteFile) :-
     close(File)).
 
 script_and_dot_from_file(LogFile, DotFile, WriteFile) :-
+  clearall,
   read_logs(LogFile, Logs),
   generate_model(Logs, 1, [], Graphs),
   write_dot(Graphs, DotFile),
