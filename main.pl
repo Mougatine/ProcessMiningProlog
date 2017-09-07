@@ -33,7 +33,8 @@ script_from_file(LogFile, WriteFile) :-
   setup_call_cleanup(
     open(WriteFile, write, File),
     write_sequences(File, Script),
-    close(File)).
+    close(File)),
+  !.
 
 script_and_dot_from_file(LogFile, DotFile, WriteFile) :-
   clearall,
@@ -44,4 +45,5 @@ script_and_dot_from_file(LogFile, DotFile, WriteFile) :-
   setup_call_cleanup(
     open(WriteFile, write, File),
     write_sequences(File, Script),
-    close(File)).
+    close(File)),
+  !.

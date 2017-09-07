@@ -22,11 +22,6 @@ retrieve_id(Id) :-
     current_graph(Id),
     !.
 
-% Check if the element exist
-member(X, [X|_]).
-member(X, [_|R]) :-
-  member(X, R).
-
 % Add an element if not in the list.
 unique_add(X, L, L) :-
   member(X, L).
@@ -44,8 +39,11 @@ append_list([X|L1], L2, L) :-
 % Create alphabet
 create_alphabet([], L, L).
 create_alphabet([L|R], Acc, Res) :-
+    \+ subset([L], Acc),
     append_list(Acc, [L], AccBis),
     create_alphabet(R, AccBis, Res).
+create_alphabet([_|R], Acc, Res) :-
+    create_alphabet(R, Acc, Res).
 
 %=============================================================================
 % Inductive Mining algorithm

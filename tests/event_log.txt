@@ -1,4 +1,5 @@
 [<a, b, c>],
 [<a, b, c>, <b, d>^2],
 [<a, d, e, d, f>],
-[<a, b, c>, <a, b, d>]
+[<a, b, c>, <a, b, d>],
+[<a, b, c, g, h, i>, <a, d, e, d, f, g, h, i>, <a, c, b, g, h, i>, <a, d, e, d, g, h, f, g, h, i>]

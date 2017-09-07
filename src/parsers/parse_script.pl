@@ -55,7 +55,7 @@ elt(Arg) --> [X], { atom_codes(Arg, [X]) }.
 
 operator(Term) --> "SEQ", "(", array_exp(Op), ")", { build_term(seq, Op, Term) }.
 operator(Term) --> "ALT", "(", array_exp(Op), ")", { build_term(alt, Op, Term) }.
-operator(Term) --> "ALT", "(", array_exp(Op), ")", { build_term(par, Op, Term) }.
+operator(Term) --> "PAR", "(", array_exp(Op), ")", { build_term(par, Op, Term) }.
 operator(Term) --> "LOOP", "(", array_exp(Op), ")", { build_term(loop, Op, Term) }.
 
 % build_term creates a term from a functor

@@ -236,7 +236,8 @@ write_dot_sub([G|Graph], StartId, File) :-
 write_struct(Graphs, File) :-
     write(File, 'digraph G {\n'),
     write_dot_sub(Graphs, 1, File),
-    write(File, '}\n').
+    write(File, '}\n'),
+    flush_output(File).
 
 write_dot(Graphs, FileName) :-
   setup_call_cleanup(
