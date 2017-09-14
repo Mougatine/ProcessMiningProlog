@@ -20,9 +20,17 @@ and return an event script describing the model.
 
 `./main.pl path_to_file_with_logs output_file`
 
+Example:
+
+`./main.pl tests/event_log.txt results.txt`
+
 *To create a model from the logs, print it to a dot file and print the corresponding script:*
 
 `./main.pl path_to_file_with_logs output_file -d dotfile_name`
+
+Example:
+
+`./main.pl tests/event_log.txt results.txt -d graph.dot`
 
 *To generate an image from the dotfile:*
 
