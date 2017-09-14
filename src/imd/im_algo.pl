@@ -5,9 +5,12 @@ clearall :-
     retractall(node(_, _, _, _)),
     retractall(neg_node(_, _, _)),
     retractall(loop_node(_, _, _)),
-    retractall(current_graph(_)).
+    retractall(current_graph(_)),
+    retractall(graph_inputs(_, _)),
+    retractall(graph_outputs(_, _)).
 
-:- dynamic (visited/1, node/4, neg_node/3, loop_node/3, current_graph/1), clearall.
+:- dynamic (visited/1, node/4, neg_node/3, loop_node/3,
+            current_graph/1, graph_start/2, graph_end/2), clearall.
 
 %-----------------------------------------------------------------------------
 % Misc functions.
@@ -544,14 +547,38 @@ existing_graph([Start|_], List, Graph) :-
 % If the graph with the same start already exists, complete it
 % Otherwise, create a new graph representing a new possibility
 %-- 
+add_start_activity([X|_], Id) :-
+    graph_start(Id, Start),
+    unique_add(X, Start, NewStart),
+    retract(graph_start(Id, Start)),
+    assert(graph_start(Id, NewStart)).
+add_start_activity([X|_], Id) :-
+    assert(graph_start(Id, [X])).
+
+add_end_activity(Logs, Id) :-
+    last(Logs, X),
+    graph_end(Id, Start),
+    unique_add(X, Start, NewStart),
+    retract(graph_end(Id, Start)),
+    assert(graph_end(Id, NewStart)).
+add_end_activity([X|_], Id) :-
+    assert(graph_end(Id, [X])).
+
 generate_graph(Log, States, Id, Id, L1, [Graph|L2]) :-
     existing_graph(Log, L1, G),
+    graph_id(G, GId, _),
+    add_start_activity(Log, GId),
+    add_end_activity(Log, GId),
     delete(L1, G, L2),
     complete_graph(Log, States, G, Graph).
 
 generate_graph(L, States, Id, NewId, List, [Graph|List]) :-
     create_graph(L, States, G1),
     append([Id], G1, G2),
+    assert(graph_start(Id, [])),
+    assert(graph_end(Id, [])),
+    add_start_activity(L, Id),
+    add_end_activity(L, Id),
     incr(Id, NewId),
     create_database(G2),
     order_graph(Id, L, Graph).

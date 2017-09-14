@@ -180,16 +180,32 @@ order_graph(Id, Logs, OrderedGraph) :-
 % Writes the graph into a dot file 
 %--
 
-write_start_link(Id, StartId, Graph, File) :-
-    first(Graph, Node),
-    unpack_node(Node, A, _, _),
-    select(Val, A, []),
+write_start_link_sub([], _, _, _).
+write_start_link_sub([S|States], Id, StartId, File) :-
     write(File, 'Start'),
     write(File, StartId),
     write(File, ' -> '),
-    write(File, Val),
+    write(File, S),
     write(File, Id),
-    write(File, ';\n').
+    write(File, ';\n'),
+    write_start_link_sub(States, Id, StartId, File).
+
+write_start_link(Id, StartId, File) :-
+    graph_start(Id, StartList),
+    write_start_link_sub(StartList, Id, StartId, File).
+
+write_end_link_sub([], _, _, _).
+write_end_link_sub([S|States], Id, EndId, File) :-
+    write(File, S),
+    write(File, Id),
+    write(File, ' -> '),
+    write(File, 'End'),
+    write(File, EndId),
+    write(File, ';\n'),
+    write_end_link_sub(States, Id, EndId, File).
+write_end_link(Id, EndId, File) :-
+    graph_end(Id, EndList),
+    write_end_link_sub(EndList, Id, EndId, File).
 
 write_node(_, _, [], _).
 write_node(Id, Node, [O|Out], File) :-
@@ -214,28 +230,33 @@ write_graph_sub(Id, [G|Graph], File) :-
     write_node(Id, Node, Out, File),
     write_graph_sub(Id, Graph, File).
 
-write_graph_header([], _, _).
-write_graph_header([G1|Graphs], StartId, File) :-
+write_graph_header([], _, _, _).
+write_graph_header([G1|Graphs], StartId, EndId, File) :-
     graph_id(G1, Id, G2),
-    write_start_link(Id, StartId, G2, File),
+    write_start_link(Id, StartId, File),
+    write_end_link(Id, EndId, File),
     write_graph_sub(Id, G2, File),
-    write_graph_header(Graphs, StartId, File).
+    write_graph_header(Graphs, StartId, EndId, File).
 
-write_graph(Graph, StartId, File) :-
+write_graph(Graph, StartId, EndId, File) :-
     write(File, 'Start'),
     write(File, StartId),
     write(File, ' [style=filled, fillcolor = yellow]\n'),
-    write_graph_header(Graph, StartId, File).
+    write(File, 'End'),
+    write(File, EndId),
+    write(File, ' [style=filled, fillcolor = yellow]\n'),
+    write_graph_header(Graph, StartId, EndId, File).
 
-write_dot_sub([], _, _).
-write_dot_sub([G|Graph], StartId, File) :-
-    write_graph(G, StartId, File),
+write_dot_sub([], _, _, _).
+write_dot_sub([G|Graph], StartId, EndId, File) :-
+    write_graph(G, StartId, EndId, File),
     incr(StartId, NewId),
-    write_dot_sub(Graph, NewId, File).
+    incr(EndId, NewEndId),
+    write_dot_sub(Graph, NewId, NewEndId, File).
 
 write_struct(Graphs, File) :-
     write(File, 'digraph G {\n'),
-    write_dot_sub(Graphs, 1, File),
+    write_dot_sub(Graphs, 1, 1, File),
     write(File, '}\n'),
     flush_output(File).
 
